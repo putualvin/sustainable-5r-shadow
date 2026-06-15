@@ -19,6 +19,26 @@ enum Role {
   management
 }
 
+// The 5 R principles — level-1 category for audit findings.
+enum Pillar {
+  RINGKAS
+  RAPI
+  RESIK
+  RAWAT
+  RAJIN
+}
+
+enum AuditStatus {
+  DRAFT
+  SUBMITTED
+}
+
+// Finding lifecycle for Module 2. CAPA closing statuses live in Module 3.
+enum FindingStatus {
+  DRAFT
+  PENDING_CAPA
+}
+
 // Parent grouping for areas; Daily Checklist items are shared per parent group.
 enum AreaGroup {
   REFINERY
@@ -35,6 +55,9 @@ model User {
   area      Area?    @relation(fields: [areaId], references: [id])
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  audits    Audit[]
+  schedules AuditSchedule[]
 }
 
 model Area {
@@ -45,8 +68,10 @@ model Area {
   active    Boolean    @default(true)
   createdAt DateTime   @default(now())
 
-  pics   User[]
-  scores Score[]
+  pics      User[]
+  scores    Score[]
+  audits    Audit[]
+  schedules AuditSchedule[]
 }
 
 // Monthly 5R score per area. In Module 3 these are recomputed from CAPA
@@ -64,4 +89,75 @@ model Score {
 
   @@unique([areaId, period])
   @@index([period])
+}
+
+// Official 5R taxonomy (27 sub-categories across the 5 pillars). Used ONLY to
+// classify audit findings — NOT the Daily Checklist (separate model later).
+model GuidingQuestion {
+  id          String   @id @default(cuid())
+  pillar      Pillar
+  subCategory String // level-2 name shown in the dropdown
+  description String // helper text guiding judgement
+  order       Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  findings Finding[]
+
+  @@index([pillar])
+}
+
+// Who audits which area in a given period (committee-managed).
+model AuditSchedule {
+  id        String   @id @default(cuid())
+  area      Area     @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  areaId    String
+  auditor   User     @relation(fields: [auditorId], references: [id])
+  auditorId String
+  period    String // "YYYY-MM"
+  dueDate   DateTime?
+  createdAt DateTime @default(now())
+
+  audits Audit[]
+
+  @@unique([areaId, period])
+  @@index([auditorId, period])
+}
+
+// One audit = one auditor inspecting one area in one period.
+model Audit {
+  id          String        @id @default(cuid())
+  area        Area          @relation(fields: [areaId], references: [id])
+  areaId      String
+  auditor     User          @relation(fields: [auditorId], references: [id])
+  auditorId   String
+  schedule    AuditSchedule? @relation(fields: [scheduleId], references: [id])
+  scheduleId  String?
+  period      String // "YYYY-MM"
+  status      AuditStatus   @default(DRAFT)
+  submittedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  findings Finding[]
+
+  @@index([auditorId])
+  @@index([areaId, period])
+}
+
+model Finding {
+  id                String          @id @default(cuid())
+  audit             Audit           @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  auditId           String
+  guidingQuestion   GuidingQuestion @relation(fields: [guidingQuestionId], references: [id])
+  guidingQuestionId String
+  locationDetail    String? // specific spot within the area
+  description       String
+  photoPath         String? // /uploads/...
+  status            FindingStatus   @default(DRAFT)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([auditId])
+  @@index([status])
 }

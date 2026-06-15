@@ -92,3 +92,20 @@ Format:
 
 **Consequences:** When a later module needs Postgres or Prisma 7, revisit decision 1. The `SECTION_ACCESS` map is the place to change any access rule.
 
+---
+
+## 2026-06-15 — Module 2: form state API, photo storage, finding distribution
+
+**Context:** Building Audit input. Stack is Next.js 14 + React 18.
+
+**Decisions:**
+1. **`useFormState` / `useFormStatus` (react-dom), not `useActionState`.** `useActionState` is a React 19 API and throws on this React 18 stack. Server-action forms use `useFormState` for return state and a `useFormStatus`-based `SubmitButton` for pending. (Login uses `useTransition` + a manual action call.)
+2. **Photo storage = `public/uploads/`** via `lib/upload.ts` (`savePhoto`), filename `randomUUID()`. Shadow-build only; production would use object storage. Folder is git-ignored. Server Action body limit raised to 12mb in `next.config.mjs` for camera images.
+3. **Photo input supports camera AND gallery** (rule 5): one `<input type=file accept=image/*>` with two triggers — "Kamera" toggles `capture=environment`, "Galeri" omits it.
+4. **No minimum-finding-count rule** (rule 2) — `submitAudit` locks the audit and `updateMany` sets all findings to `PENDING_CAPA` regardless of count, distributing them to the area PIC.
+5. **Findings reference `GuidingQuestion`** (the 27-item taxonomy) rather than duplicating pillar/sub-category strings; the pillar is read via the relation.
+
+**Rationale:** Match the installed React version, keep storage zero-infra, follow the explicit business rules.
+
+**Consequences:** When upgrading to React 19 later, `useFormState`→`useActionState` is a mechanical swap. Photo files live outside git; a fresh clone starts with an empty uploads dir.
+

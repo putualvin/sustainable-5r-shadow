@@ -11,6 +11,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { navForRole } from "@/lib/rbac";
 import { gradeFor } from "@/lib/scoring";
+import { formatPeriod } from "@/lib/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 
 export default async function HomePage() {
@@ -93,16 +94,4 @@ export default async function HomePage() {
       </div>
     </div>
   );
-}
-
-// "2026-06" -> "Jun 2026" (lightweight; date-fns formatting used elsewhere).
-function formatPeriod(period: string | null): string {
-  if (!period) return "";
-  const [y, m] = period.split("-");
-  const months = [
-    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
-    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
-  ];
-  const idx = Number(m) - 1;
-  return `${months[idx] ?? m} ${y}`;
 }

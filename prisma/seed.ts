@@ -1,7 +1,52 @@
-import { PrismaClient, type AreaGroup, type Role } from "@prisma/client";
+import {
+  PrismaClient,
+  type AreaGroup,
+  type Pillar,
+  type Role,
+} from "@prisma/client";
 import { calculate5RScore } from "../lib/scoring";
 
 const db = new PrismaClient();
+
+// Official 5R taxonomy — 27 sub-categories (Guidelines Sustainable 5R v.2).
+const GUIDING_QUESTIONS: {
+  pillar: Pillar;
+  subCategory: string;
+  description: string;
+}[] = [
+  // RINGKAS (5)
+  { pillar: "RINGKAS", subCategory: "Material dan atau Suku cadang", description: "Di area kerja tidak terdapat material yang tidak diperlukan untuk proses saat ini." },
+  { pillar: "RINGKAS", subCategory: "Mesin dan atau Peralatan Kerja", description: "Di area kerja ini tidak terdapat mesin / peralatan / tooling yang tidak sedang digunakan dan tanpa adanya tag merah." },
+  { pillar: "RINGKAS", subCategory: "Alat Bantu, Cetakan, dan Jig", description: "Di area kerja ini tidak terdapat jig, alat bantu, cetakan, atau item sejenisnya yang tidak digunakan." },
+  { pillar: "RINGKAS", subCategory: "Arsip", description: "Di area kerja ini tidak terdapat dokumen (semua informasi tertulis/tercetak baik yang berhubungan dengan kerja maupun tidak) yang sudah tidak terpakai / habis masa berlaku." },
+  { pillar: "RINGKAS", subCategory: "Jumlah barang dengan Tag Merah", description: "Barang-barang dengan tag merah yang belum dipindahkan ke Red Tag Area." },
+  // RAPI (5)
+  { pillar: "RAPI", subCategory: "Indikator Lokasi, Penyediaan Wadah", description: "Area penyimpanan, area kerja, dan lainnya telah diberi tanda lokasi dan alamat. Semua barang ada tempatnya." },
+  { pillar: "RAPI", subCategory: "Indikator Item", description: "Wadah; rak, pallet, basket, dll memiliki tanda yang menunjukkan item apa harus berada di mana." },
+  { pillar: "RAPI", subCategory: "Indikator Jumlah", description: "Dalam wadah tercantum indikasi untuk jumlah maksimum dan minimum yang diperbolehkan." },
+  { pillar: "RAPI", subCategory: "Garis Demarkasi", description: "Terdapat garis / warna maupun penanda lain yang digunakan untuk mematuhi SOP serta tidak ada barang yang diletakkan di luar batas garis." },
+  { pillar: "RAPI", subCategory: "Shadow Board / Rak / Wadah", description: "Penataan telah diatur untuk memfasilitasi kemudahan pengambilan, pengembalian, monitoring, FIFO." },
+  // RESIK (5)
+  { pillar: "RESIK", subCategory: "Lantai", description: "Kebersihan lantai dijaga, berkilau, bebas dari ceceran sampah, material, oli, dan air." },
+  { pillar: "RESIK", subCategory: "Mesin dan atau Peralatan Kerja", description: "Mesin bebas dari serbuk / gram, sisa material, dan oli." },
+  { pillar: "RESIK", subCategory: "Membersihkan = Memeriksa", description: "Terdapat sistem pembersihan dan pelaporan abnormalitas; jadwal piket, sarana kebersihan, tempat sampah." },
+  { pillar: "RESIK", subCategory: "Area Kritis / Sumber Kotor", description: "Pada sumber pengotor sudah terlihat tindakan pembersihan." },
+  { pillar: "RESIK", subCategory: "Kebiasaan Membersihkan", description: "Pekerja tanpa diperintah terbiasa membersihkan lantai dan mengelap mesin." },
+  // RAWAT (7)
+  { pillar: "RAWAT", subCategory: "SOP", description: "Di area kerja tercantum SOP 5R (alur proses) maupun Standar Kerja terkini." },
+  { pillar: "RAWAT", subCategory: "Standard", description: "Terdapat standard area di setiap tempat kerja." },
+  { pillar: "RAWAT", subCategory: "CheckList Standard", description: "Terdapat checklist standard area." },
+  { pillar: "RAWAT", subCategory: "Improvement R1", description: "Terdapat tindak lanjut temuan audit sebelumnya, realisasi Improvement R1, maupun rencana improvement." },
+  { pillar: "RAWAT", subCategory: "Improvement R2", description: "Terdapat tindak lanjut temuan audit sebelumnya, realisasi Improvement R2, maupun rencana improvement." },
+  { pillar: "RAWAT", subCategory: "Improvement R3", description: "Terdapat tindak lanjut temuan audit sebelumnya, realisasi Improvement R3, maupun rencana improvement." },
+  { pillar: "RAWAT", subCategory: "Audit 5R periode sebelumnya", description: "Tidak terdapat temuan audit dari periode sebelumnya yang belum di-close." },
+  // RAJIN (5)
+  { pillar: "RAJIN", subCategory: "Ketaatan pada Standar", description: "Semua standar kerja (IK, Looking Standard, SOP 5R, dll) diikuti oleh karyawan." },
+  { pillar: "RAJIN", subCategory: "Promosi 5R", description: "Terdapat pesan / slogan terkait budaya 5R." },
+  { pillar: "RAJIN", subCategory: "Prosedur", description: "Prosedur-prosedur kerja (IK, Looking Standard, Memo Kerja, Resep, Process Card, Diagram Alir) dalam kondisi terkini dan ditinjau secara tetap." },
+  { pillar: "RAJIN", subCategory: "Papan Aktivitas 5R", description: "Papan aktivitas 5R dalam kondisi terkini dan secara tetap ditinjau." },
+  { pillar: "RAJIN", subCategory: "Pelatihan", description: "Setiap karyawan telah mendapatkan pelatihan prosedur kerja yang tepat." },
+];
 
 // Seeded finding tallies per area (current period). finalScore is derived via
 // lib/scoring.ts — never hand-computed. Chosen to spread scores ~60–95%.
@@ -120,13 +165,40 @@ async function main() {
     });
   }
 
-  const [areaCount, userCount, scoreCount] = await Promise.all([
-    db.area.count(),
-    db.user.count(),
-    db.score.count(),
-  ]);
+  // Guiding Questions (27) — seed once.
+  if ((await db.guidingQuestion.count()) === 0) {
+    let order = 0;
+    for (const gq of GUIDING_QUESTIONS) {
+      await db.guidingQuestion.create({ data: { ...gq, order: order++ } });
+    }
+  }
+
+  // Audit schedules for current period: alternate auditors across areas.
+  const auditor1 = await db.user.findUnique({ where: { email: "auditor1@5r.local" } });
+  const auditor2 = await db.user.findUnique({ where: { email: "auditor2@5r.local" } });
+  if (auditor1 && auditor2) {
+    const allAreas = await db.area.findMany({ orderBy: { code: "asc" } });
+    for (let i = 0; i < allAreas.length; i++) {
+      const auditorId = i % 2 === 0 ? auditor1.id : auditor2.id;
+      await db.auditSchedule.upsert({
+        where: { areaId_period: { areaId: allAreas[i].id, period } },
+        update: { auditorId },
+        create: { areaId: allAreas[i].id, auditorId, period },
+      });
+    }
+  }
+
+  const [areaCount, userCount, scoreCount, gqCount, schedCount] =
+    await Promise.all([
+      db.area.count(),
+      db.user.count(),
+      db.score.count(),
+      db.guidingQuestion.count(),
+      db.auditSchedule.count(),
+    ]);
   console.log(
-    `Done. Areas: ${areaCount}, Users: ${userCount}, Scores: ${scoreCount} (period ${period})`
+    `Done. Areas: ${areaCount}, Users: ${userCount}, Scores: ${scoreCount}, ` +
+      `GuidingQuestions: ${gqCount}, Schedules: ${schedCount} (period ${period})`
   );
 }
 
