@@ -75,10 +75,11 @@ model Area {
   active    Boolean    @default(true)
   createdAt DateTime   @default(now())
 
-  pics      User[]
-  scores    Score[]
-  audits    Audit[]
-  schedules AuditSchedule[]
+  pics          User[]
+  scores        Score[]
+  audits        Audit[]
+  schedules     AuditSchedule[]
+  checklistRuns ChecklistRun[]
 }
 
 // Monthly 5R score per area. In Module 3 these are recomputed from CAPA
@@ -185,4 +186,50 @@ model Capa {
   status           CapaStatus @default(PROGRESS)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+}
+
+// ===== Daily Checklist — COMPLETELY SEPARATE from Audit (rule 6) =====
+// Self-check done per shift by the area's own PIC. Items are area-specific,
+// scoped to the parent area group (Refinery / Fractionation).
+
+model ChecklistItem {
+  id        String    @id @default(cuid())
+  group     AreaGroup
+  text      String
+  order     Int       @default(0)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  responses ChecklistResponse[]
+
+  @@index([group])
+}
+
+model ChecklistRun {
+  id        String   @id @default(cuid())
+  area      Area     @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  areaId    String
+  date      String // YYYY-MM-DD
+  shift     Int // 1, 2, or 3
+  score     Int      @default(0) // percent compliant
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  responses ChecklistResponse[]
+
+  @@unique([areaId, date, shift])
+  @@index([areaId])
+}
+
+model ChecklistResponse {
+  id        String        @id @default(cuid())
+  run       ChecklistRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId     String
+  item      ChecklistItem @relation(fields: [itemId], references: [id])
+  itemId    String
+  compliant Boolean
+  note      String?
+  photoPath String?
+
+  @@unique([runId, itemId])
 }

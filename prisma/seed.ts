@@ -70,6 +70,36 @@ const SCORE_TALLIES: {
   { code: "LAB", done: 17, progress: 4, noProgress: 1 },
 ];
 
+// Daily Checklist items per parent group (from AppSheet documentation, verbatim).
+const CHECKLIST_ITEMS: { group: AreaGroup; text: string }[] = [
+  // Refinery (14)
+  { group: "REFINERY", text: "Apakah drip pan pompa pompa Refinery dalam kondisi bersih" },
+  { group: "REFINERY", text: "Apakah drip pan dan area D304 dan D300 dalam kondisi bersih" },
+  { group: "REFINERY", text: "Apakah area control room Refinery bersih, tidak berminyak, dan berdebu" },
+  { group: "REFINERY", text: "Apakah area HPB dan compressor tidak ada ceceran minyak" },
+  { group: "REFINERY", text: "Apakah area sampling point bersih" },
+  { group: "REFINERY", text: "Apakah Strainer in plant dalam kondisi bersih" },
+  { group: "REFINERY", text: "Apakah Counter Bag filter sesuai actual stock" },
+  { group: "REFINERY", text: "Apakah ada ceceran minyak dan tumpahan SBE di area SBE" },
+  { group: "REFINERY", text: "Apakah ada tumpahan BE dan PA di area unloading" },
+  { group: "REFINERY", text: "Apakah ada pressure indicator yang abnormal" },
+  { group: "REFINERY", text: "Apakah ada barang yang tidak pada tempatnya (sarung tangan, majun, dll)" },
+  { group: "REFINERY", text: "Apakah ada barang yang tidak pada tempatnya (sepatu, sarung tangan, helm)" },
+  { group: "REFINERY", text: "Apakah area wastafel lantai 1 bersih, tidak becek, dan sabun terisi" },
+  { group: "REFINERY", text: "Apakah area wastafel lantai 2 tidak becek dan terisi sabun" },
+  // Fractionation (10)
+  { group: "FRACTIONATION", text: "Apakah drip pan pompa dan HE fractionation dalam kondisi bersih" },
+  { group: "FRACTIONATION", text: "Apakah drip pan pompa di filling room B dalam kondisi bersih" },
+  { group: "FRACTIONATION", text: "Apakah drip pan pompa di filling room C dalam kondisi bersih" },
+  { group: "FRACTIONATION", text: "Apakah ada ceceran minyak di lantai area coldroom dan filling room" },
+  { group: "FRACTIONATION", text: "Apakah ada ceceran minyak di lantai area ruang filter press" },
+  { group: "FRACTIONATION", text: "Apakah ada tumpahan / genangan di area pencucian filter leaf" },
+  { group: "FRACTIONATION", text: "Apakah area sparepart terkunci dan dalam keadaan rapi" },
+  { group: "FRACTIONATION", text: "Apakah jendela belakang filter press room di lantai 3 tertutup" },
+  { group: "FRACTIONATION", text: "Apakah kotak APD di lantai 1 untuk masuk area H-2 terisi cukup" },
+  { group: "FRACTIONATION", text: "Apakah kotak APD di lantai 2 untuk masuk area H-2 terisi cukup" },
+];
+
 function currentPeriod(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -223,17 +253,27 @@ async function main() {
     }
   }
 
-  const [areaCount, userCount, scoreCount, gqCount, schedCount] =
+  // Daily Checklist items (24) — seed once.
+  if ((await db.checklistItem.count()) === 0) {
+    let order = 0;
+    for (const item of CHECKLIST_ITEMS) {
+      await db.checklistItem.create({ data: { ...item, order: order++ } });
+    }
+  }
+
+  const [areaCount, userCount, scoreCount, gqCount, schedCount, itemCount] =
     await Promise.all([
       db.area.count(),
       db.user.count(),
       db.score.count(),
       db.guidingQuestion.count(),
       db.auditSchedule.count(),
+      db.checklistItem.count(),
     ]);
   console.log(
     `Done. Areas: ${areaCount}, Users: ${userCount}, Scores: ${scoreCount}, ` +
-      `GuidingQuestions: ${gqCount}, Schedules: ${schedCount} (period ${period})`
+      `GuidingQuestions: ${gqCount}, Schedules: ${schedCount}, ` +
+      `ChecklistItems: ${itemCount} (period ${period})`
   );
 }
 

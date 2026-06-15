@@ -126,3 +126,20 @@ Format:
 
 **Consequences:** "Komite verify CAPA" (a separate approval step) is noted in the roadmap but not built — current flow recomputes immediately on PIC save.
 
+---
+
+## 2026-06-15 — Module 4: Daily Checklist (separate from Audit)
+
+**Context:** Daily self-check per shift by the area PIC. Rule 6: completely separate from Audit.
+
+**Decisions:**
+1. **Separate models** `ChecklistItem` / `ChecklistRun` / `ChecklistResponse` — no shared tables or questions with audit. Items scoped to parent `AreaGroup` (Refinery/Fractionation); each floor inherits its group's items. Seeded 14 Refinery + 10 Fractionation verbatim.
+2. **Run keyed by `(areaId, date, shift)`** (unique). Re-submitting upserts the run and replaces its responses. Score = round(% compliant). Warning shown when score < 90% (threshold from CLAUDE.md).
+3. **Per-item optional note + photo** only when "Tidak Sesuai" (revealed client-side); photos saved via the same `savePhoto` helper.
+4. **History = simple list** (date · shift · score). The month-calendar view in the roadmap is "nice to have" and deferred.
+5. **Non-PIC / area-without-group** see an info message instead of a form (Storage, Loading Bay, etc. have no items yet — committee must define them).
+
+**Rationale:** Honour the hard separation rule, keep submission idempotent per shift, stay in scope.
+
+**Consequences:** Areas without a parent group cannot run a checklist until items are defined. Calendar history can be added later without schema changes.
+
