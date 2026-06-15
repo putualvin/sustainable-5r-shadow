@@ -188,6 +188,41 @@ async function main() {
     }
   }
 
+  // A submitted audit for REF-2 with findings awaiting CAPA — gives the PIC
+  // (pic.refinery2) an inbox and lets the audit->CAPA->score loop be demoed.
+  const ref2 = await db.area.findUnique({ where: { code: "REF-2" } });
+  if (ref2 && auditor1 && (await db.audit.count({ where: { areaId: ref2.id, period } })) === 0) {
+    const gqs = await db.guidingQuestion.findMany({ orderBy: { order: "asc" } });
+    const pick = (sub: string) => gqs.find((g) => g.subCategory === sub)!;
+    const audit = await db.audit.create({
+      data: {
+        areaId: ref2.id,
+        auditorId: auditor1.id,
+        period,
+        status: "SUBMITTED",
+        submittedAt: new Date(),
+      },
+    });
+    const findingSeeds = [
+      { gq: pick("Lantai"), location: "Dekat pompa P-101", description: "Ceceran oli di lantai area pompa." },
+      { gq: pick("Garis Demarkasi"), location: "Area drum", description: "Drum diletakkan di luar garis demarkasi." },
+      { gq: pick("Material dan atau Suku cadang"), location: "Rak B2", description: "Material tidak terpakai menumpuk di rak." },
+      { gq: pick("SOP"), location: "Panel kontrol", description: "SOP 5R tidak terpasang/usang." },
+      { gq: pick("Promosi 5R"), location: "Dinding lorong", description: "Tidak ada slogan/visual budaya 5R." },
+    ];
+    for (const f of findingSeeds) {
+      await db.finding.create({
+        data: {
+          auditId: audit.id,
+          guidingQuestionId: f.gq.id,
+          locationDetail: f.location,
+          description: f.description,
+          status: "PENDING_CAPA",
+        },
+      });
+    }
+  }
+
   const [areaCount, userCount, scoreCount, gqCount, schedCount] =
     await Promise.all([
       db.area.count(),

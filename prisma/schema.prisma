@@ -39,6 +39,13 @@ enum FindingStatus {
   PENDING_CAPA
 }
 
+// CAPA closing status — drives the area score (see lib/scoring.ts).
+enum CapaStatus {
+  DONE
+  PROGRESS
+  NO_PROGRESS
+}
+
 // Parent grouping for areas; Daily Checklist items are shared per parent group.
 enum AreaGroup {
   REFINERY
@@ -158,6 +165,24 @@ model Finding {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
+  capa Capa?
+
   @@index([auditId])
   @@index([status])
+}
+
+// Corrective & Preventive Action — one per finding. No dispute step (rule 3),
+// single after-photo (rule 4).
+model Capa {
+  id               String     @id @default(cuid())
+  finding          Finding    @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  findingId        String     @unique
+  rootCause        String
+  correctiveAction String
+  preventiveAction String
+  afterPhoto       String? // /uploads/... (single photo)
+  dueDate          DateTime?
+  status           CapaStatus @default(PROGRESS)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }

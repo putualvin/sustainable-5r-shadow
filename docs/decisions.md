@@ -109,3 +109,20 @@ Format:
 
 **Consequences:** When upgrading to React 19 later, `useFormState`→`useActionState` is a mechanical swap. Photo files live outside git; a fresh clone starts with an empty uploads dir.
 
+---
+
+## 2026-06-15 — Module 3: CAPA model + auto-scoring recompute
+
+**Context:** Closing the audit → CAPA → score loop.
+
+**Decisions:**
+1. **`Capa` is 1:1 with `Finding`** (`findingId @unique`). Fields: rootCause, correctiveAction, preventiveAction (two separate text fields), single `afterPhoto` (rule 4), dueDate, status `DONE|PROGRESS|NO_PROGRESS`. No dispute step (rule 3).
+2. **Score recompute counts only findings that HAVE a CAPA** for the area+period; findings still `PENDING_CAPA` are "not yet evaluated" and excluded. `recomputeAreaScore()` calls the one `calculate5RScore()` engine and upserts `Score`. Runs on every CAPA save.
+3. **Seeded scores stay for areas without CAPA.** Recompute only overwrites the area being acted on, so the overview shows seeded baselines plus live-computed values. (Verified: REF-2 went 95%→33% after 1 Done/1 Progress/1 No Progress.)
+4. **`scores` section excluded from auditee RBAC** — PIC fills CAPA but views scores via komite/management/auditor/admin. PIC verifying their own score isn't part of the flow.
+5. **Seed adds a submitted REF-2 audit + 5 findings** so the PIC has a CAPA inbox out of the box.
+
+**Rationale:** Make the scoring loop demonstrable and correct, with the formula in exactly one place.
+
+**Consequences:** "Komite verify CAPA" (a separate approval step) is noted in the roadmap but not built — current flow recomputes immediately on PIC save.
+
