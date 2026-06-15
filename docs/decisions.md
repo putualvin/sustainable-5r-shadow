@@ -143,3 +143,20 @@ Format:
 
 **Consequences:** Areas without a parent group cannot run a checklist until items are defined. Calendar history can be added later without schema changes.
 
+---
+
+## 2026-06-15 — Module 5: Red Tag
+
+**Context:** Registration → coordinator disposal decision, with QR and deadlines.
+
+**Decisions:**
+1. **`RedTag` model** with `tagNumber` `RT-YYYY-NNN` generated on create (count of that year's tags + 1, zero-padded). `registeredAt` is a dedicated field (default now, override-able in seed) so urgency can be backdated for demos; `dueDate` = registeredAt + retention.
+2. **Retention by location:** `IN_AREA` 30 days, `RT_AREA` 90 days (`RETENTION_DAYS` in `lib/redtag.ts`).
+3. **Status = `OPEN` → `INTERNAL`/`EXTERNAL`/`DISPOSED`.** Only `kord_red_tag`/`admin` may decide, and only while `OPEN`. Auditee/PIC can register.
+4. **Urgency** computed at render from `dueDate` vs now (overdue / ≤7 days approaching / else ok); `decided` tags show "Selesai". Drives the list filter chips and auto-flag colours.
+5. **QR via `qrcode.react`** (`QRCodeSVG`) encoding the tag number, on the detail page.
+
+**Rationale:** Self-contained module; deadlines and QR make it demo-tangible.
+
+**Consequences:** Tag numbering is per-calendar-year and not gap-safe (deletions would leave gaps) — fine for a shadow build.
+

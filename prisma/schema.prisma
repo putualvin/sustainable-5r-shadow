@@ -46,6 +46,20 @@ enum CapaStatus {
   NO_PROGRESS
 }
 
+// Red Tag storage location → retention period (30 vs 90 days).
+enum RedTagLocation {
+  IN_AREA // disimpan di area, maks 30 hari
+  RT_AREA // dipindah ke Red Tag Area, maks 90 hari
+}
+
+// Red Tag lifecycle: OPEN until the coordinator decides its disposal.
+enum RedTagStatus {
+  OPEN
+  INTERNAL // digunakan kembali secara internal
+  EXTERNAL // dijual / dipindah ke pihak luar
+  DISPOSED // dimusnahkan
+}
+
 // Parent grouping for areas; Daily Checklist items are shared per parent group.
 enum AreaGroup {
   REFINERY
@@ -80,6 +94,7 @@ model Area {
   audits        Audit[]
   schedules     AuditSchedule[]
   checklistRuns ChecklistRun[]
+  redTags       RedTag[]
 }
 
 // Monthly 5R score per area. In Module 3 these are recomputed from CAPA
@@ -232,4 +247,25 @@ model ChecklistResponse {
   photoPath String?
 
   @@unique([runId, itemId])
+}
+
+// ===== Red Tag =====
+model RedTag {
+  id           String         @id @default(cuid())
+  tagNumber    String         @unique // RT-YYYY-NNN
+  area         Area           @relation(fields: [areaId], references: [id])
+  areaId       String
+  name         String
+  category     String
+  reason       String
+  location     RedTagLocation
+  photoPath    String?
+  status       RedTagStatus   @default(OPEN)
+  registeredAt DateTime       @default(now())
+  dueDate      DateTime
+  decidedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([status])
 }

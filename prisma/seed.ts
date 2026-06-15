@@ -5,6 +5,7 @@ import {
   type Role,
 } from "@prisma/client";
 import { calculate5RScore } from "../lib/scoring";
+import { RETENTION_DAYS } from "../lib/redtag";
 
 const db = new PrismaClient();
 
@@ -258,6 +259,40 @@ async function main() {
     let order = 0;
     for (const item of CHECKLIST_ITEMS) {
       await db.checklistItem.create({ data: { ...item, order: order++ } });
+    }
+  }
+
+  // Sample Red Tags for REF-2 (varied urgency) — seed once.
+  if (ref2 && (await db.redTag.count()) === 0) {
+    const day = 1000 * 60 * 60 * 24;
+    const now = Date.now();
+    const year = new Date().getFullYear();
+    const seeds = [
+      // approaching: registered 27 days ago, IN_AREA (30d) -> due in ~3 days
+      { name: "Motor pompa cadangan rusak", category: "Suku Cadang", reason: "Rusak, tidak dapat diperbaiki", location: "IN_AREA" as const, regAgo: 27, status: "OPEN" as const },
+      // overdue: registered 95 days ago, RT_AREA (90d) -> overdue ~5 days
+      { name: "Drum bekas pelarut", category: "Material", reason: "Tidak terpakai di proses saat ini", location: "RT_AREA" as const, regAgo: 95, status: "OPEN" as const },
+      // decided
+      { name: "Panel kontrol lama", category: "Peralatan / Tooling", reason: "Sudah diganti unit baru", location: "RT_AREA" as const, regAgo: 40, status: "DISPOSED" as const },
+    ];
+    let seq = 1;
+    for (const s of seeds) {
+      const registeredAt = new Date(now - s.regAgo * day);
+      const dueDate = new Date(registeredAt.getTime() + RETENTION_DAYS[s.location] * day);
+      await db.redTag.create({
+        data: {
+          tagNumber: `RT-${year}-${String(seq++).padStart(3, "0")}`,
+          areaId: ref2.id,
+          name: s.name,
+          category: s.category,
+          reason: s.reason,
+          location: s.location,
+          status: s.status,
+          registeredAt,
+          dueDate,
+          decidedAt: s.status === "OPEN" ? null : new Date(now - 10 * day),
+        },
+      });
     }
   }
 
