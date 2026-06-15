@@ -1,52 +1,84 @@
-import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import {
+  ArrowRight,
+  Gauge,
+  ListChecks,
+  Wrench,
+  Tag,
+} from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { navForRole, roleLabel } from "@/lib/rbac";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { navForRole } from "@/lib/rbac";
+import { gradeFor } from "@/lib/scoring";
+import { KpiCard } from "@/components/shared/kpi-card";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  // PIC areas are tied to a specific area.
-  const area = user.areaId
-    ? await db.area.findUnique({ where: { id: user.areaId } })
-    : null;
+  // Real KPI: average 5R score for the latest period present in the DB.
+  const latest = await db.score.findFirst({ orderBy: { period: "desc" } });
+  const period = latest?.period ?? null;
+  const scores = period
+    ? await db.score.findMany({ where: { period } })
+    : [];
 
-  // Quick links = the sections this role can reach (excluding Home itself).
+  const avgScore =
+    scores.length > 0
+      ? Math.round(scores.reduce((s, x) => s + x.finalScore, 0) / scores.length)
+      : 0;
+  const grade = gradeFor(avgScore);
+
   const quickLinks = navForRole(user.role).filter((n) => n.section !== "home");
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">Selamat datang,</p>
         <h1 className="text-2xl font-bold tracking-tight">{user.name}</h1>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Identitas Pengguna</CardTitle>
-          <CardDescription>Informasi akun yang sedang masuk.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <Field label="Nama" value={user.name} />
-          <Field label="Email" value={user.email} />
-          <Field label="Peran" value={roleLabel(user.role)} />
-          <Field label="Area" value={area ? area.name : "—"} />
-        </CardContent>
-      </Card>
+      {/* KPI ringkas */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard
+          label="Skor 5R Rata-rata"
+          value={scores.length > 0 ? `${avgScore}%` : "—"}
+          caption={
+            scores.length > 0
+              ? `${grade.label} · ${scores.length} area · ${formatPeriod(period)}`
+              : "Belum ada data skor"
+          }
+          icon={Gauge}
+          tone={scores.length > 0 ? grade.tone : "neutral"}
+        />
+        <KpiCard
+          label="Checklist Harian"
+          value="—"
+          caption="Segera (Module 4)"
+          icon={ListChecks}
+          tone="neutral"
+        />
+        <KpiCard
+          label="CAPA Terbuka"
+          value="—"
+          caption="Segera (Module 3)"
+          icon={Wrench}
+          tone="neutral"
+        />
+        <KpiCard
+          label="Red Tag Aktif"
+          value="—"
+          caption="Segera (Module 5)"
+          icon={Tag}
+          tone="neutral"
+        />
+      </div>
 
+      {/* Akses cepat */}
       <div>
         <h2 className="mb-3 font-semibold">Menu Anda</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {quickLinks.map((link) => (
             <Link
               key={link.section}
@@ -63,11 +95,14 @@ export default async function HomePage() {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium">{value}</p>
-    </div>
-  );
+// "2026-06" -> "Jun 2026" (lightweight; date-fns formatting used elsewhere).
+function formatPeriod(period: string | null): string {
+  if (!period) return "";
+  const [y, m] = period.split("-");
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+  ];
+  const idx = Number(m) - 1;
+  return `${months[idx] ?? m} ${y}`;
 }

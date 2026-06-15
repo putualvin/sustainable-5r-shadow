@@ -1,6 +1,34 @@
 import { PrismaClient, type AreaGroup, type Role } from "@prisma/client";
+import { calculate5RScore } from "../lib/scoring";
 
 const db = new PrismaClient();
+
+// Seeded finding tallies per area (current period). finalScore is derived via
+// lib/scoring.ts — never hand-computed. Chosen to spread scores ~60–95%.
+const SCORE_TALLIES: {
+  code: string;
+  done: number;
+  progress: number;
+  noProgress: number;
+}[] = [
+  { code: "REF-1", done: 17, progress: 3, noProgress: 1 },
+  { code: "REF-2", done: 20, progress: 2, noProgress: 0 },
+  { code: "REF-3", done: 12, progress: 5, noProgress: 4 },
+  { code: "FRA-1", done: 15, progress: 4, noProgress: 2 },
+  { code: "FRA-2", done: 18, progress: 2, noProgress: 1 },
+  { code: "FRA-3", done: 10, progress: 6, noProgress: 3 },
+  { code: "STG", done: 19, progress: 2, noProgress: 1 },
+  { code: "LDB", done: 14, progress: 5, noProgress: 3 },
+  { code: "CTR", done: 16, progress: 3, noProgress: 2 },
+  { code: "WSH", done: 13, progress: 4, noProgress: 3 },
+  { code: "OFF", done: 19, progress: 3, noProgress: 0 },
+  { code: "LAB", done: 17, progress: 4, noProgress: 1 },
+];
+
+function currentPeriod(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
 
 // 12 areas of pilot unit "Refinery 2".
 const AREAS: { code: string; name: string; group: AreaGroup | null }[] = [
@@ -63,11 +91,43 @@ async function main() {
     });
   }
 
-  const [areaCount, userCount] = await Promise.all([
+  // Scores for the current period
+  const period = currentPeriod();
+  for (const t of SCORE_TALLIES) {
+    const area = await db.area.findUnique({ where: { code: t.code } });
+    if (!area) continue;
+    const { finalScore } = calculate5RScore({
+      done: t.done,
+      progress: t.progress,
+      noProgress: t.noProgress,
+    });
+    await db.score.upsert({
+      where: { areaId_period: { areaId: area.id, period } },
+      update: {
+        countDone: t.done,
+        countProgress: t.progress,
+        countNoProgress: t.noProgress,
+        finalScore,
+      },
+      create: {
+        areaId: area.id,
+        period,
+        countDone: t.done,
+        countProgress: t.progress,
+        countNoProgress: t.noProgress,
+        finalScore,
+      },
+    });
+  }
+
+  const [areaCount, userCount, scoreCount] = await Promise.all([
     db.area.count(),
     db.user.count(),
+    db.score.count(),
   ]);
-  console.log(`Done. Areas: ${areaCount}, Users: ${userCount}`);
+  console.log(
+    `Done. Areas: ${areaCount}, Users: ${userCount}, Scores: ${scoreCount} (period ${period})`
+  );
 }
 
 main()

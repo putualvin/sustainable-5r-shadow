@@ -45,5 +45,23 @@ model Area {
   active    Boolean    @default(true)
   createdAt DateTime   @default(now())
 
-  pics User[]
+  pics   User[]
+  scores Score[]
+}
+
+// Monthly 5R score per area. In Module 3 these are recomputed from CAPA
+// statuses via lib/scoring.ts; for now they are seeded directly.
+model Score {
+  id              String   @id @default(cuid())
+  area            Area     @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  areaId          String
+  period          String // "YYYY-MM"
+  countDone       Int      @default(0)
+  countProgress   Int      @default(0)
+  countNoProgress Int      @default(0)
+  finalScore      Int      @default(0) // computed via lib/scoring.ts
+  createdAt       DateTime @default(now())
+
+  @@unique([areaId, period])
+  @@index([period])
 }
