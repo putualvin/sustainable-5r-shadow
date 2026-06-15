@@ -76,3 +76,19 @@ Format:
 - Seed includes 27 guiding questions and 24 checklist items (14 Refinery + 10 Fractionation). Other areas have no items yet — committee needs to define them.
 - This closes Open Question OQ-03 in BRD v3.0 (format of guiding questions) — the format is the dropdown bertingkat already defined in the Guidelines.
 
+---
+
+## 2026-06-15 — Module 0: Prisma 6 (not 7), RBAC map, and nav overflow
+
+**Context:** Scaffolding Module 0 (Foundation). A few choices weren't spelled out in CLAUDE.md.
+
+**Decisions:**
+1. **Pinned Prisma to v6** (`prisma@6`, `@prisma/client@6`). Prisma 7 removes the `url` field from `schema.prisma` and requires a driver adapter for SQLite, which adds friction and diverges from the classic `DATABASE_URL` flow assumed in `docs/setup-instructions.md`. v6 keeps `url = env("DATABASE_URL")` and a plain `PrismaClient()` — simpler, and trivially upgradable later.
+2. **RBAC is a single source-of-truth map** in `lib/rbac.ts` (`SECTION_ACCESS: Record<Section, Role[]>`) plus `canAccess()` / `navForRole()` / `sectionForPath()`. Middleware and UI both consume it; no inline `role === "admin"` checks. Unit-tested.
+3. **Mobile bottom nav overflow** — roles with >5 sections (komite, admin) show the first 4 items plus a "Lainnya" button that opens a bottom sheet with the rest. Avoids building a full drawer for Module 0 while honouring the "bottom nav on mobile" rule.
+4. **Stub pages** created for all nav targets (audit, capa, checklist, redtag, scores, schedule, reports, documents, admin) using a shared `Placeholder` component, so navigation and RBAC 403 are demonstrable now. These get replaced module by module.
+
+**Rationale:** Keep Module 0 simple, verifiable, and aligned with the roadmap's "demo-ready fast" principle.
+
+**Consequences:** When a later module needs Postgres or Prisma 7, revisit decision 1. The `SECTION_ACCESS` map is the place to change any access rule.
+

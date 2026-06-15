@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Sinar Mas red #C8102E */
+    --primary: 350 85% 42%;
+    --primary-dark: 350 84% 34%; /* #A00D24 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 65% 51%; /* #D32F2F */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Status tokens */
+    --info: 210 79% 46%; /* #1976D2 */
+    --info-foreground: 0 0% 100%;
+    --success: 123 46% 34%; /* #2E7D32 */
+    --success-foreground: 0 0% 100%;
+    --warning: 27 98% 47%; /* #ED6C02 */
+    --warning-foreground: 0 0% 100%;
+    --danger: 0 65% 51%; /* #D32F2F */
+    --danger-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 350 85% 42%;
+
+    --radius: 0.5rem; /* 8px */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  /* Tabular numerals untuk semua skor & angka */
+  .tabular-nums,
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

@@ -1,0 +1,49 @@
+// Sustainable 5R — Prisma schema (SQLite, shadow build)
+// Module 0: User + Area only. Schema grows per roadmap module.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  komite_unit
+  auditor
+  auditee
+  kord_red_tag
+  management
+}
+
+// Parent grouping for areas; Daily Checklist items are shared per parent group.
+enum AreaGroup {
+  REFINERY
+  FRACTIONATION
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      Role     @default(auditee)
+  // PIC (auditee) is tied to one area; other roles leave this null.
+  areaId    String?
+  area      Area?    @relation(fields: [areaId], references: [id])
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Area {
+  id        String     @id @default(cuid())
+  code      String     @unique
+  name      String
+  group     AreaGroup?
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  pics User[]
+}
