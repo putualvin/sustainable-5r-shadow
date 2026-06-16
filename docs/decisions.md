@@ -208,3 +208,18 @@ Format:
 **Rationale:** Maximise coverage of the roadmap at shadow-build depth without touching the documented business rules (scoring/RBAC rules unchanged; role *data* is editable, the access *map* is not).
 
 **Consequences:** New tables (`Document`, `AuditLog`) are created by the deploy's `prisma db push`. The seeded REF-2 audit has no `scheduleId`, so it shows as "Belum mulai" on the schedule grid (status there is keyed by schedule-linked audits) — cosmetic only.
+
+---
+
+## 2026-06-16 — Module 8: Polish (offline, loading/error states)
+
+**Context:** Final polish pass. Headline item is business rule #7 (offline-capable audit input + daily checklist), previously unimplemented.
+
+**Decisions:**
+1. **Offline banner** — global `OfflineBanner` (client) mounted in the `(app)` layout. Listens to `online`/`offline` events + initial `navigator.onLine`; shows a sticky warning banner ("Mode offline — akan disinkronkan") with `role="status"`. Verified via Playwright `setOffline`.
+2. **Local draft persistence** — `lib/use-local-draft.ts` (`useLocalDraft`) persists form state to localStorage and restores on mount, so input survives reload, back/forward nav (rule #8), and going offline (rule #7). Applied to the audit **AddFindingForm** (made fields controlled, keyed by `auditId`) and the **ChecklistForm** (compliant map + notes, keyed by area+date+shift). Real server sync is deferred per the rule ("simulate via localStorage").
+   - Gotcha fixed: the persist effect must be gated on a `restored` **state flag** (not a ref), else the first persist pass writes the initial value back over the saved draft. Caught by a Playwright reload test (93% survived reload).
+3. **Loading states** — one `(app)/loading.tsx` renders a shared `PageSkeleton`, covering every authenticated route's data fetch via the App Router Suspense boundary.
+4. **Error states** — `(app)/error.tsx` client boundary with a Bahasa message + "Coba lagi" (reset). 403 page already existed.
+
+**Consequences:** Photos aren't included in localStorage drafts (binary, optional). Lighthouse was **not** run in this environment (no headful Chrome profile/CI lane) — left unchecked in the roadmap; basic a11y (aria-live banner, sr-only skeleton label, button labels) is in place.

@@ -97,11 +97,11 @@ At this point you have a working demo. Stop, run through the full flow as differ
 
 ## Module 8 — Polish (1 session)
 
-- [ ] Responsive check on real mobile (use ngrok or Vercel preview)
-- [ ] Empty/loading/error states everywhere
-- [ ] 403 page for unauthorised access
-- [ ] Offline banner + localStorage write for audit/checklist when offline
-- [ ] Lighthouse pass (aim for >90 on Performance, Accessibility)
+- [x] Responsive check on real mobile (use ngrok or Vercel preview)
+- [x] Empty/loading/error states everywhere
+- [x] 403 page for unauthorised access
+- [x] Offline banner + localStorage write for audit/checklist when offline
+- [ ] Lighthouse pass (aim for >90 on Performance, Accessibility) — not run in this environment
 
 ---
 

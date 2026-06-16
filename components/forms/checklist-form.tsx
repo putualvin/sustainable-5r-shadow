@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useFormStatus } from "react-dom";
 
 import { submitChecklist } from "@/lib/actions/checklist";
+import { useLocalDraft } from "@/lib/use-local-draft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhotoInput } from "@/components/forms/photo-input";
@@ -11,32 +12,45 @@ import { cn } from "@/lib/utils";
 
 type Item = { id: string; text: string };
 type Defaults = Record<string, { compliant: boolean; note: string }>;
+type Draft = {
+  compliant: Record<string, boolean>;
+  notes: Record<string, string>;
+};
 
 export function ChecklistForm({
   items,
   shift,
   defaults,
+  storageKey,
 }: {
   items: Item[];
   shift: number;
   defaults: Defaults;
+  storageKey: string;
 }) {
-  const [compliant, setCompliant] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(
+  // Draft persists locally (rule #7) so input survives reload / offline.
+  const initial: Draft = {
+    compliant: Object.fromEntries(
       items.map((i) => [i.id, defaults[i.id]?.compliant ?? true])
-    )
-  );
+    ),
+    notes: Object.fromEntries(items.map((i) => [i.id, defaults[i.id]?.note ?? ""])),
+  };
+  const [draft, setDraft, clearDraft] = useLocalDraft<Draft>(storageKey, initial);
 
   const compliantCount = useMemo(
-    () => Object.values(compliant).filter(Boolean).length,
-    [compliant]
+    () => items.filter((i) => draft.compliant[i.id]).length,
+    [items, draft.compliant]
   );
   const score = items.length
     ? Math.round((compliantCount / items.length) * 100)
     : 0;
 
   return (
-    <form action={submitChecklist} className="space-y-4">
+    <form
+      action={submitChecklist}
+      onSubmit={() => clearDraft()}
+      className="space-y-4"
+    >
       <input type="hidden" name="shift" value={shift} />
 
       {/* Skor langsung */}
@@ -56,7 +70,7 @@ export function ChecklistForm({
 
       <ul className="space-y-3">
         {items.map((item) => {
-          const ok = compliant[item.id];
+          const ok = draft.compliant[item.id];
           return (
             <li key={item.id} className="rounded-lg border p-3">
               <p className="text-sm">{item.text}</p>
@@ -70,7 +84,10 @@ export function ChecklistForm({
                   active={ok}
                   tone="ok"
                   onClick={() =>
-                    setCompliant((m) => ({ ...m, [item.id]: true }))
+                    setDraft((d) => ({
+                      ...d,
+                      compliant: { ...d.compliant, [item.id]: true },
+                    }))
                   }
                 >
                   Sesuai
@@ -79,7 +96,10 @@ export function ChecklistForm({
                   active={!ok}
                   tone="bad"
                   onClick={() =>
-                    setCompliant((m) => ({ ...m, [item.id]: false }))
+                    setDraft((d) => ({
+                      ...d,
+                      compliant: { ...d.compliant, [item.id]: false },
+                    }))
                   }
                 >
                   Tidak Sesuai
@@ -90,7 +110,13 @@ export function ChecklistForm({
                 <div className="mt-3 space-y-2 border-t pt-3">
                   <Input
                     name={`note_${item.id}`}
-                    defaultValue={defaults[item.id]?.note ?? ""}
+                    value={draft.notes[item.id] ?? ""}
+                    onChange={(e) =>
+                      setDraft((d) => ({
+                        ...d,
+                        notes: { ...d.notes, [item.id]: e.target.value },
+                      }))
+                    }
                     placeholder="Catatan ketidaksesuaian"
                   />
                   <PhotoInput name={`photo_${item.id}`} />

@@ -116,7 +116,12 @@ export default async function ChecklistPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ChecklistForm items={items} shift={shift} defaults={defaults} />
+          <ChecklistForm
+            items={items}
+            shift={shift}
+            defaults={defaults}
+            storageKey={`draft:checklist:${area.id}:${date}:${shift}`}
+          />
         </CardContent>
       </Card>
 
