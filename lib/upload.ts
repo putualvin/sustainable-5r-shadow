@@ -21,3 +21,24 @@ export async function savePhoto(file: File): Promise<string | null> {
 
   return `/uploads/${filename}`;
 }
+
+const DOC_ALLOWED = [
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "png", "jpg", "jpeg",
+];
+
+// Save an uploaded document (any common office/image type) to public/uploads.
+// Shadow build only; on serverless hosts the filesystem is ephemeral, so prefer
+// an external URL for the hosted demo (see addDocument).
+export async function saveDocumentFile(file: File): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+
+  const rawExt = (file.name.split(".").pop() ?? "").toLowerCase();
+  if (!DOC_ALLOWED.includes(rawExt)) return null;
+  const filename = `${randomUUID()}.${rawExt}`;
+
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  const bytes = Buffer.from(await file.arrayBuffer());
+  await writeFile(path.join(UPLOAD_DIR, filename), bytes);
+
+  return `/uploads/${filename}`;
+}

@@ -192,3 +192,19 @@ Format:
 **Consequences:**
 - Every production deploy re-syncs the schema and re-runs the seed. Seeded rows (areas/users/scores) are re-upserted, so a redeploy resets seeded scores (e.g. a recomputed REF-2 score returns to its seed tally). User-created rows (findings/CAPA/checklist runs/red tags beyond seeds) are NOT deleted. Fine for a demo; if a deploy must preserve live edits, drop `tsx prisma/seed.ts` from the build command first.
 - Mock auth means the URL is a **public demo** — anyone with the link can log in as any role. Not for sensitive data.
+
+---
+
+## 2026-06-16 — Module 7: Schedule, Documents, Admin
+
+**Context:** Final feature module. Three sub-areas, two new entities.
+
+**Decisions:**
+1. **Schedule** reuses the existing `AuditSchedule` model (no schema change). `generateSchedule` assigns active auditors round-robin across active areas (idempotent upsert per area+period); `shuffleSchedule` reassigns auditors via Fisher–Yates but **skips schedules whose audit already started** (so in-progress work isn't orphaned). Both are komite_unit/admin only; auditors view read-only. Period held in the URL (`?period=`), not state.
+2. **Documents** — new `Document` model (`title`, `category` enum, `version`, optional `fileUrl`, `description`, denormalized `uploadedBy`). Repository groups by category with version badges. `fileUrl` may be an uploaded file **or** an external URL; the form recommends URLs because the serverless filesystem is ephemeral (uploaded files won't persist on Vercel — same limitation noted for photos). komite_unit/admin manage; everyone reads. Seeded 6 reference docs (files attached via UI).
+3. **Admin** — users table with inline role change (`RoleSelect`, auto-submits) and active toggle. Guards prevent an admin self-demoting or self-deactivating (lockout safety). Admin only (`SECTION_ACCESS.admin`).
+4. **Audit log** — new append-only `AuditLog` model with **denormalized** user name/email (survives user edits). `lib/audit-log.ts#logAction` is best-effort (never throws into the calling action). Wired into the Module-7 mutations (schedule generate/shuffle, document add/delete, role/active changes) plus `submitAudit`. Coverage is the meaningful mutations, not literally every write — more call sites can be added later. Seeded 3 example entries so the log isn't empty.
+
+**Rationale:** Maximise coverage of the roadmap at shadow-build depth without touching the documented business rules (scoring/RBAC rules unchanged; role *data* is editable, the access *map* is not).
+
+**Consequences:** New tables (`Document`, `AuditLog`) are created by the deploy's `prisma db push`. The seeded REF-2 audit has no `scheduleId`, so it shows as "Belum mulai" on the schedule grid (status there is keyed by schedule-linked audits) — cosmetic only.

@@ -1,6 +1,7 @@
 import {
   PrismaClient,
   type AreaGroup,
+  type DocCategory,
   type Pillar,
   type Role,
 } from "@prisma/client";
@@ -99,6 +100,22 @@ const CHECKLIST_ITEMS: { group: AreaGroup; text: string }[] = [
   { group: "FRACTIONATION", text: "Apakah jendela belakang filter press room di lantai 3 tertutup" },
   { group: "FRACTIONATION", text: "Apakah kotak APD di lantai 1 untuk masuk area H-2 terisi cukup" },
   { group: "FRACTIONATION", text: "Apakah kotak APD di lantai 2 untuk masuk area H-2 terisi cukup" },
+];
+
+// Reference documents for the repository (Module 7). fileUrl left null —
+// registered references whose files/links are attached via the UI.
+const DOCUMENTS: {
+  title: string;
+  category: DocCategory;
+  version: string;
+  description: string;
+}[] = [
+  { title: "Guidelines Sustainable 5R v.2", category: "PANDUAN", version: "v2.0", description: "Panduan resmi 5R beserta 27 guiding questions (Des 2025)." },
+  { title: "SOP Pelaksanaan Audit 5R", category: "SOP", version: "v1.2", description: "Tata cara audit bulanan lintas area oleh auditor." },
+  { title: "SOP Pengelolaan Red Tag", category: "SOP", version: "v1.0", description: "Alur registrasi hingga keputusan disposal barang red tag." },
+  { title: "Standar Area Refinery", category: "STANDARD", version: "v1.1", description: "Standar kondisi 5R untuk area Refinery Lt 1–3." },
+  { title: "Template Temuan & CAPA", category: "TEMPLATE", version: "v1.0", description: "Format isian temuan audit dan rencana CAPA." },
+  { title: "Formulir Checklist Harian", category: "FORMULIR", version: "v1.0", description: "Cetakan checklist harian per shift untuk PIC area." },
 ];
 
 function currentPeriod(): string {
@@ -330,7 +347,25 @@ async function main() {
     }
   }
 
-  const [areaCount, userCount, scoreCount, gqCount, schedCount, itemCount] =
+  // Reference documents (Module 7) — seed once.
+  if ((await db.document.count()) === 0) {
+    for (const d of DOCUMENTS) {
+      await db.document.create({ data: { ...d, uploadedBy: "Komite Unit" } });
+    }
+  }
+
+  // Seed a few audit-log entries so the log isn't empty on first load.
+  if ((await db.auditLog.count()) === 0) {
+    await db.auditLog.createMany({
+      data: [
+        { action: "system.seed", entity: "System", summary: "Inisialisasi data master & seed.", userName: "Sistem", userEmail: "-" },
+        { action: "schedule.generate", entity: "AuditSchedule", summary: `Membuat jadwal audit periode ${period} untuk 12 area.`, userName: "Halim (Komite Unit)", userEmail: "komite@5r.local" },
+        { action: "audit.submit", entity: "Audit", summary: "Audit Refinery Lt 2 dikirim dengan 5 temuan.", userName: "Muhib (Auditor)", userEmail: "auditor1@5r.local" },
+      ],
+    });
+  }
+
+  const [areaCount, userCount, scoreCount, gqCount, schedCount, itemCount, docCount] =
     await Promise.all([
       db.area.count(),
       db.user.count(),
@@ -338,11 +373,12 @@ async function main() {
       db.guidingQuestion.count(),
       db.auditSchedule.count(),
       db.checklistItem.count(),
+      db.document.count(),
     ]);
   console.log(
     `Done. Areas: ${areaCount}, Users: ${userCount}, Scores: ${scoreCount}, ` +
       `GuidingQuestions: ${gqCount}, Schedules: ${schedCount}, ` +
-      `ChecklistItems: ${itemCount} (period ${period})`
+      `ChecklistItems: ${itemCount}, Documents: ${docCount} (period ${period})`
   );
 }
 

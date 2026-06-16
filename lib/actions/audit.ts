@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccess } from "@/lib/rbac";
 import { savePhoto } from "@/lib/upload";
+import { logAction } from "@/lib/audit-log";
 import { findingSchema } from "@/lib/schemas/finding";
 
 // Start an audit from a schedule entry (auditor for that schedule, or komite/admin).
@@ -103,7 +104,10 @@ export async function submitAudit(formData: FormData): Promise<void> {
   const auditId = String(formData.get("auditId") ?? "");
   const audit = await db.audit.findUnique({
     where: { id: auditId },
-    include: { _count: { select: { findings: true } } },
+    include: {
+      _count: { select: { findings: true } },
+      area: { select: { name: true } },
+    },
   });
   if (!audit || audit.status !== "DRAFT") redirect("/audit");
 
@@ -118,6 +122,12 @@ export async function submitAudit(formData: FormData): Promise<void> {
       data: { status: "PENDING_CAPA" },
     }),
   ]);
+
+  await logAction({
+    action: "audit.submit",
+    entity: "Audit",
+    summary: `Audit ${audit.area.name} dikirim dengan ${audit._count.findings} temuan.`,
+  });
 
   revalidatePath(`/audit/${auditId}`);
   revalidatePath("/audit");

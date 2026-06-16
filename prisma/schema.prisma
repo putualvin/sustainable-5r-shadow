@@ -66,6 +66,15 @@ enum AreaGroup {
   FRACTIONATION
 }
 
+// Document repository categories (Module 7).
+enum DocCategory {
+  PANDUAN // panduan / guidelines
+  SOP // standard operating procedure
+  STANDARD // standar area
+  TEMPLATE // template / contoh
+  FORMULIR // formulir / checklist cetak
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -247,6 +256,38 @@ model ChecklistResponse {
   photoPath String?
 
   @@unique([runId, itemId])
+}
+
+// ===== Module 7: Document repository =====
+// Versioned 5R reference docs. fileUrl may be an uploaded file (/uploads/..)
+// or an external link; uploadedBy is denormalized (mock auth, no FK).
+model Document {
+  id          String      @id @default(cuid())
+  title       String
+  category    DocCategory
+  version     String      @default("v1.0")
+  fileUrl     String? // /uploads/.. or external URL
+  description String?
+  uploadedBy  String? // denormalized uploader name
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([category])
+}
+
+// ===== Module 7: Audit log =====
+// Append-only record of notable actions. User identity is denormalized so the
+// log survives user edits/deletions.
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String // machine key, e.g. "user.role.update"
+  entity    String // "User" | "AuditSchedule" | "Document" | ...
+  summary   String // human-readable (Bahasa)
+  userName  String
+  userEmail String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // ===== Red Tag =====

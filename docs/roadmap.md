@@ -90,10 +90,10 @@ At this point you have a working demo. Stop, run through the full flow as differ
 
 ## Module 7 — Schedule, Documents, Admin (1-2 sessions)
 
-- [ ] Audit schedule calendar (komite can auto-generate + shuffle)
-- [ ] Document repository with categories and version badges
-- [ ] Admin: user/role management table
-- [ ] Audit log of all actions
+- [x] Audit schedule calendar (komite can auto-generate + shuffle)
+- [x] Document repository with categories and version badges
+- [x] Admin: user/role management table
+- [x] Audit log of all actions
 
 ## Module 8 — Polish (1 session)
 
