@@ -160,3 +160,21 @@ Format:
 
 **Consequences:** Tag numbering is per-calendar-year and not gap-safe (deletions would leave gaps) — fine for a shadow build.
 
+
+---
+
+## 2026-06-16 — Module 6: Monthly Report (read-only over existing data)
+
+**Context:** Closing the roadmap's reporting module. Needed an executive monthly view without introducing new entities or touching the scoring/RBAC business rules.
+
+**Decisions:**
+1. **No schema change.** The report aggregates existing `Score`, `Finding`, and `Audit` rows. RBAC is unchanged — `reports` is already scoped to `komite_unit`/`management`/`admin` in `SECTION_ACCESS`.
+2. **Aggregation helpers are pure** in `lib/reports.ts` (`averageScore`, `totalCapaStatuses`, `findingsByPillar`, `recurringFindings`) with unit tests (`lib/reports.test.ts`). The page (`app/(app)/reports/page.tsx`) is a Server Component doing direct Prisma reads, then delegating math to those helpers — no scoring math inlined (rule 1).
+3. **Compliance donut + per-area table are driven by `Score`** (rich, all 12 areas), while the category bar and recurring panel are driven by `Finding` rows for the current period's submitted audits (sparse but real — only seeded REF-2 has findings). Honest empty states where data is thin.
+4. **Seeded 2 prior months of `Score`** (idempotent upsert, `periodMonthsAgo`) so the trend line and "vs last month" deltas render meaningfully. Older months trend slightly lower → gentle upward trend.
+5. **Print to PDF** reuses the existing `PrintButton` (`window.print()`); chart/cards print as laid out.
+6. **Home KPIs wired up** — the stale "Segera (Module 3/4/5)" placeholders now show real counts: open CAPA (findings PENDING_CAPA not yet Done), active Red Tags (status OPEN), and average Daily Checklist compliance this period.
+
+**Rationale:** Maximise demo value at minimal risk — no business-rule or schema changes, all logic in one tested place.
+
+**Consequences:** "Top categories" / "recurring findings" stay thin until more audits are submitted (real or seeded). PIC ranking is represented by the per-area score table (sorted desc) rather than a separate widget; auditor ranking is a dedicated activity list.

@@ -106,6 +106,13 @@ function currentPeriod(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// "YYYY-MM" for the month `n` months before now (for seeded score history).
+function periodMonthsAgo(n: number): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 // 12 areas of pilot unit "Refinery 2".
 const AREAS: { code: string; name: string; group: AreaGroup | null }[] = [
   { code: "REF-1", name: "Refinery Lt 1", group: "REFINERY" },
@@ -194,6 +201,33 @@ async function main() {
         finalScore,
       },
     });
+  }
+
+  // Score history for the 2 previous periods so the monthly report trend and
+  // "vs last month" deltas are meaningful. Older months trend slightly lower
+  // (some Done shifted to Progress/No Progress) → a gentle upward trend.
+  for (const offset of [2, 1]) {
+    const histPeriod = periodMonthsAgo(offset);
+    for (const t of SCORE_TALLIES) {
+      const area = await db.area.findUnique({ where: { code: t.code } });
+      if (!area) continue;
+      const done = Math.max(0, t.done - offset * 2);
+      const progress = t.progress + offset;
+      const noProgress = t.noProgress + offset;
+      const { finalScore } = calculate5RScore({ done, progress, noProgress });
+      await db.score.upsert({
+        where: { areaId_period: { areaId: area.id, period: histPeriod } },
+        update: { countDone: done, countProgress: progress, countNoProgress: noProgress, finalScore },
+        create: {
+          areaId: area.id,
+          period: histPeriod,
+          countDone: done,
+          countProgress: progress,
+          countNoProgress: noProgress,
+          finalScore,
+        },
+      });
+    }
   }
 
   // Guiding Questions (27) — seed once.

@@ -21,15 +21,36 @@ export default async function HomePage() {
   // Real KPI: average 5R score for the latest period present in the DB.
   const latest = await db.score.findFirst({ orderBy: { period: "desc" } });
   const period = latest?.period ?? null;
-  const scores = period
-    ? await db.score.findMany({ where: { period } })
-    : [];
+  const [scores, openCapa, activeRedTags, checklistRuns] = await Promise.all([
+    period ? db.score.findMany({ where: { period } }) : Promise.resolve([]),
+    // Findings distributed to a PIC but not yet closed (no CAPA, or CAPA not Done).
+    db.finding.count({
+      where: {
+        status: "PENDING_CAPA",
+        OR: [{ capa: null }, { capa: { status: { not: "DONE" } } }],
+      },
+    }),
+    db.redTag.count({ where: { status: "OPEN" } }),
+    period
+      ? db.checklistRun.findMany({
+          where: { createdAt: { gte: new Date(`${period}-01`) } },
+          select: { score: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const avgScore =
     scores.length > 0
       ? Math.round(scores.reduce((s, x) => s + x.finalScore, 0) / scores.length)
       : 0;
   const grade = gradeFor(avgScore);
+
+  const checklistAvg =
+    checklistRuns.length > 0
+      ? Math.round(
+          checklistRuns.reduce((s, r) => s + r.score, 0) / checklistRuns.length
+        )
+      : null;
 
   const quickLinks = navForRole(user.role).filter((n) => n.section !== "home");
 
@@ -55,24 +76,34 @@ export default async function HomePage() {
         />
         <KpiCard
           label="Checklist Harian"
-          value="—"
-          caption="Segera (Module 4)"
+          value={checklistAvg !== null ? `${checklistAvg}%` : "—"}
+          caption={
+            checklistAvg !== null
+              ? `Rata-rata ${checklistRuns.length} pengisian bulan ini`
+              : "Belum ada pengisian bulan ini"
+          }
           icon={ListChecks}
-          tone="neutral"
+          tone={
+            checklistAvg === null
+              ? "neutral"
+              : checklistAvg >= 90
+                ? "success"
+                : "warning"
+          }
         />
         <KpiCard
           label="CAPA Terbuka"
-          value="—"
-          caption="Segera (Module 3)"
+          value={`${openCapa}`}
+          caption={openCapa > 0 ? "Temuan menunggu penutupan" : "Semua temuan tertutup"}
           icon={Wrench}
-          tone="neutral"
+          tone={openCapa > 0 ? "warning" : "success"}
         />
         <KpiCard
           label="Red Tag Aktif"
-          value="—"
-          caption="Segera (Module 5)"
+          value={`${activeRedTags}`}
+          caption={activeRedTags > 0 ? "Menunggu keputusan koordinator" : "Tidak ada yang aktif"}
           icon={Tag}
-          tone="neutral"
+          tone={activeRedTags > 0 ? "info" : "success"}
         />
       </div>
 

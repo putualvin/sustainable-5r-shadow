@@ -83,10 +83,10 @@ At this point you have a working demo. Stop, run through the full flow as differ
 
 ## Module 6 — Monthly report (1 session)
 
-- [ ] Report page: executive summary, KPIs, trend chart, per-area table, top categories, compliance donut
-- [ ] Recurring findings panel (keyword/category matching — keep it simple)
-- [ ] Auditor & PIC ranking
-- [ ] Print to PDF works
+- [x] Report page: executive summary, KPIs, trend chart, per-area table, top categories, compliance donut
+- [x] Recurring findings panel (keyword/category matching — keep it simple)
+- [x] Auditor & PIC ranking
+- [x] Print to PDF works
 
 ## Module 7 — Schedule, Documents, Admin (1-2 sessions)
 
