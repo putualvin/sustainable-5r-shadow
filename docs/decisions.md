@@ -178,3 +178,17 @@ Format:
 **Rationale:** Maximise demo value at minimal risk — no business-rule or schema changes, all logic in one tested place.
 
 **Consequences:** "Top categories" / "recurring findings" stay thin until more audits are submitted (real or seeded). PIC ranking is represented by the per-area score table (sorted desc) rather than a separate widget; auditor ranking is a dedicated activity list.
+
+---
+
+## 2026-06-16 — Deploy: Vercel + Neon, schema push & seed run during build
+
+**Context:** Stakeholder wanted a live URL. App is Next.js 14 + Prisma on PostgreSQL (Neon). The shadow-build sandbox's network policy blocks outbound Postgres (port 5432), so `prisma db push` / seed can't run from the build container — but Vercel's build/runtime reach Neon normally.
+
+**Decision:** `vercel.json` sets `buildCommand` to `prisma generate && prisma db push && tsx prisma/seed.ts && next build`. `DATABASE_URL` is supplied as a Vercel build+runtime env var. Deployed via `vercel deploy --prod` (CLI).
+
+**Rationale:** Runs the DB sync where the DB is reachable. The seed is idempotent (upserts + count guards), so re-running on each deploy is safe.
+
+**Consequences:**
+- Every production deploy re-syncs the schema and re-runs the seed. Seeded rows (areas/users/scores) are re-upserted, so a redeploy resets seeded scores (e.g. a recomputed REF-2 score returns to its seed tally). User-created rows (findings/CAPA/checklist runs/red tags beyond seeds) are NOT deleted. Fine for a demo; if a deploy must preserve live edits, drop `tsx prisma/seed.ts` from the build command first.
+- Mock auth means the URL is a **public demo** — anyone with the link can log in as any role. Not for sensitive data.
