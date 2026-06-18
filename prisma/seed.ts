@@ -164,21 +164,21 @@ async function main() {
   const users: {
     email: string;
     name: string;
-    role: Role;
+    roles: Role[];
     areaCode?: string;
   }[] = [
-    { email: "admin@5r.local", name: "Admin Sistem", role: "admin" },
-    { email: "komite@5r.local", name: "Halim (Komite Unit)", role: "komite_unit" },
-    { email: "auditor1@5r.local", name: "Muhib (Auditor)", role: "auditor" },
-    { email: "auditor2@5r.local", name: "Auditor Kedua", role: "auditor" },
+    { email: "admin@5r.local", name: "Admin Sistem", roles: ["admin"] },
+    { email: "komite@5r.local", name: "Halim (Komite Unit)", roles: ["komite_unit"] },
+    { email: "auditor1@5r.local", name: "Muhib (Auditor)", roles: ["auditor"] },
+    { email: "auditor2@5r.local", name: "Auditor Kedua", roles: ["auditor"] },
     {
       email: "pic.refinery2@5r.local",
       name: "PIC Refinery Lt 2",
-      role: "auditee",
+      roles: ["auditee"],
       areaCode: "REF-2",
     },
-    { email: "redtag@5r.local", name: "Koordinator Red Tag", role: "kord_red_tag" },
-    { email: "gm@5r.local", name: "Management", role: "management" },
+    { email: "redtag@5r.local", name: "Koordinator Red Tag", roles: ["kord_red_tag"] },
+    { email: "gm@5r.local", name: "Management", roles: ["management"] },
   ];
 
   for (const u of users) {
@@ -186,21 +186,25 @@ async function main() {
       u.areaCode === "REF-2" ? refinery2?.id ?? null : null;
     await db.user.upsert({
       where: { email: u.email },
-      update: { name: u.name, role: u.role, areaId },
-      create: { email: u.email, name: u.name, role: u.role, areaId },
+      update: { name: u.name, roles: u.roles, areaId },
+      create: { email: u.email, name: u.name, roles: u.roles, areaId },
     });
   }
 
   // A PIC (auditee) account per area so every audited area has a receiver for
   // its findings (audit -> CAPA loop works for all 12 areas, not just REF-2).
   // Email convention: pic.<area-code>@5r.local (prefix "pic" -> auditee role).
+  // FRA-1's PIC also holds the auditor role to demonstrate multi-role (one
+  // person who is both auditee for their area and an auditor elsewhere — the
+  // schedule generator never assigns them to audit their own area).
   const allAreasForPic = await db.area.findMany({ orderBy: { code: "asc" } });
   for (const area of allAreasForPic) {
     const email = `pic.${area.code.toLowerCase()}@5r.local`;
+    const roles: Role[] = area.code === "FRA-1" ? ["auditee", "auditor"] : ["auditee"];
     await db.user.upsert({
       where: { email },
-      update: { name: `PIC ${area.name}`, role: "auditee", areaId: area.id },
-      create: { email, name: `PIC ${area.name}`, role: "auditee", areaId: area.id },
+      update: { name: `PIC ${area.name}`, roles, areaId: area.id },
+      create: { email, name: `PIC ${area.name}`, roles, areaId: area.id },
     });
   }
 

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth";
-import { navForRole } from "@/lib/rbac";
+import { navForRoles } from "@/lib/rbac";
 import { AppShell } from "@/components/shared/app-shell";
 import { OfflineBanner } from "@/components/shared/offline-banner";
 
@@ -13,13 +13,13 @@ export default async function AppLayout({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const items = navForRole(user.role);
+  const items = navForRoles(user.roles);
 
   return (
     <>
       <OfflineBanner />
       <AppShell
-        user={{ name: user.name, email: user.email, role: user.role }}
+        user={{ name: user.name, email: user.email, roles: user.roles }}
         items={items}
       >
         {children}

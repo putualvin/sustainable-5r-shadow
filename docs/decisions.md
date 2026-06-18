@@ -223,3 +223,22 @@ Format:
 4. **Error states** — `(app)/error.tsx` client boundary with a Bahasa message + "Coba lagi" (reset). 403 page already existed.
 
 **Consequences:** Photos aren't included in localStorage drafts (binary, optional). Lighthouse was **not** run in this environment (no headful Chrome profile/CI lane) — left unchecked in the roadmap; basic a11y (aria-live banner, sr-only skeleton label, button labels) is in place.
+
+---
+
+## 2026-06-16 — Multi-role users (RBAC: roles[] instead of a single role)
+
+**Context:** In real 5R operations one person can be both an **auditor** (inspecting other areas) and an **auditee/PIC** (responsible for their own area). The original model gave each `User` a single `role`, so this wasn't expressible.
+
+**Decision:** Adopt standard set-based RBAC.
+1. `User.role: Role` → `User.roles: Role[]` (Postgres enum array; default `[auditee]`). Access is the **union** of all roles' permissions.
+2. `lib/rbac.ts`: `canAccess(roles, section)` (any role grants), `navForRoles`, `hasAnyRole`, `emailToRoles`, `rolesLabel`. "PIC of an area" stays modelled as `areaId` (an assignment), separate from roles.
+3. **Edge middleware** can't query the DB, so roles are written to a `session_roles` cookie at login (resolved from the DB user, or the email prefix for virtual users). `getCurrentUser` remains DB-authoritative; middleware is the coarse gate. Trade-off: an admin changing someone's roles is reflected in middleware only after that user re-logs in — but the page layer (DB) is authoritative, so it can't grant more than allowed.
+4. **Conflict of interest:** `generateSchedule`/`shuffleSchedule` never assign an auditor to audit their own area (`auditor.areaId === area.id` is skipped).
+5. **Admin UI:** single-role `<select>` → multi-select chips (`RolesSelect`) calling `setUserRoles`. Self-lockout guard now checks the *resulting set* still includes `admin`.
+6. **Demo:** PIC Fraksinasi Lt 1 (`pic.fra-1@5r.local`) holds `[auditee, auditor]` to showcase multi-role.
+
+**Consequences:**
+- Requires PostgreSQL (enum arrays aren't supported on SQLite), so the local SQLite preview path no longer applies to this feature — verification is via unit tests (RBAC, no DB) + build + the live Neon deploy.
+- The deploy's `prisma db push` now uses `--accept-data-loss` (dropping the old `role` column); the idempotent seed repopulates all users, so no meaningful data is lost in this shadow build.
+- Diverges from the single-role model implied in CLAUDE.md — an intentional enhancement; the 6 roles and the `SECTION_ACCESS` map are unchanged.

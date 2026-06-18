@@ -20,7 +20,7 @@ export default async function AuditDetailPage({
   searchParams: { submitted?: string };
 }) {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "audit")) redirect("/403");
+  if (!user || !canAccess(user.roles, "audit")) redirect("/403");
 
   const audit = await db.audit.findUnique({
     where: { id: params.id },
@@ -36,10 +36,10 @@ export default async function AuditDetailPage({
   if (!audit) notFound();
 
   // Auditors may only open their own audits.
-  if (user.role === "auditor" && audit.auditorId !== user.id) redirect("/403");
+  if (user.roles.includes("auditor") && audit.auditorId !== user.id) redirect("/403");
 
   const isDraft = audit.status === "DRAFT";
-  const canEdit = isDraft && user.role === "auditor" && audit.auditorId === user.id;
+  const canEdit = isDraft && user.roles.includes("auditor") && audit.auditorId === user.id;
 
   const guidingQuestions = await db.guidingQuestion.findMany({
     where: { active: true },

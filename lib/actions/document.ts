@@ -3,17 +3,19 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import type { Role } from "@prisma/client";
+
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { canAccess } from "@/lib/rbac";
+import { canAccess, hasAnyRole } from "@/lib/rbac";
 import { saveDocumentFile } from "@/lib/upload";
 import { logAction } from "@/lib/audit-log";
 import { documentSchema } from "@/lib/schemas/document";
 import { DOC_CATEGORY_LABEL } from "@/lib/documents";
 
 // Only komite_unit / admin may publish documents (everyone may read them).
-function canManage(role: string): boolean {
-  return role === "komite_unit" || role === "admin";
+function canManage(roles: Role[]): boolean {
+  return hasAnyRole(roles, "komite_unit", "admin");
 }
 
 export type DocumentActionState = { ok?: boolean; error?: string };
@@ -23,7 +25,7 @@ export async function addDocument(
   formData: FormData
 ): Promise<DocumentActionState> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "documents") || !canManage(user.role)) {
+  if (!user || !canAccess(user.roles, "documents") || !canManage(user.roles)) {
     return { error: "Akses ditolak." };
   }
 
@@ -67,7 +69,7 @@ export async function addDocument(
 
 export async function deleteDocument(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "documents") || !canManage(user.role)) {
+  if (!user || !canAccess(user.roles, "documents") || !canManage(user.roles)) {
     redirect("/403");
   }
 

@@ -2,30 +2,34 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { Role } from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { canAccess } from "@/lib/rbac";
+import { canAccess, hasAnyRole } from "@/lib/rbac";
 import { logAction } from "@/lib/audit-log";
 import { formatPeriod } from "@/lib/format";
 
 // Only komite_unit / admin manage the schedule (auditors view it read-only).
-function canManage(role: string): boolean {
-  return role === "komite_unit" || role === "admin";
+function canManage(roles: Role[]): boolean {
+  return hasAnyRole(roles, "komite_unit", "admin");
 }
 
+// Users who can audit. With multi-role, a PIC may also be an auditor — they're
+// included here but never assigned to audit their OWN area (conflict of
+// interest is filtered when building the schedule).
 async function activeAuditors() {
   return db.user.findMany({
-    where: { role: "auditor", active: true },
+    where: { roles: { has: "auditor" }, active: true },
     orderBy: { createdAt: "asc" },
   });
 }
 
 // Create (or refresh) a round-robin schedule for `period`: every active area is
-// assigned an auditor in rotation. Idempotent per (area, period).
+// assigned an auditor in rotation, skipping anyone who is the PIC of that area.
 export async function generateSchedule(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "schedule") || !canManage(user.role)) {
+  if (!user || !canAccess(user.roles, "schedule") || !canManage(user.roles)) {
     redirect("/403");
   }
 
@@ -39,11 +43,15 @@ export async function generateSchedule(formData: FormData): Promise<void> {
   if (auditors.length === 0) redirect("/schedule?error=no-auditors");
 
   for (let i = 0; i < areas.length; i++) {
-    const auditorId = auditors[i % auditors.length].id;
+    let pick = auditors[i % auditors.length];
+    // No self-audit: if the rotation lands on this area's own PIC, pick another.
+    if (pick.areaId === areas[i].id) {
+      pick = auditors.find((a) => a.areaId !== areas[i].id) ?? pick;
+    }
     await db.auditSchedule.upsert({
       where: { areaId_period: { areaId: areas[i].id, period } },
-      update: { auditorId },
-      create: { areaId: areas[i].id, period, auditorId },
+      update: { auditorId: pick.id },
+      create: { areaId: areas[i].id, period, auditorId: pick.id },
     });
   }
 
@@ -58,10 +66,10 @@ export async function generateSchedule(formData: FormData): Promise<void> {
 }
 
 // Reassign auditors for the period. Schedules whose audit has already started
-// are left untouched (so in-progress work isn't orphaned).
+// are left untouched; no auditor is assigned to their own area.
 export async function shuffleSchedule(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "schedule") || !canManage(user.role)) {
+  if (!user || !canAccess(user.roles, "schedule") || !canManage(user.roles)) {
     redirect("/403");
   }
 
@@ -79,7 +87,7 @@ export async function shuffleSchedule(formData: FormData): Promise<void> {
   if (auditors.length === 0) redirect("/schedule?error=no-auditors");
 
   // Fisher–Yates shuffle of the auditor pool.
-  const pool = auditors.map((a) => a.id);
+  const pool = [...auditors];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -88,9 +96,18 @@ export async function shuffleSchedule(formData: FormData): Promise<void> {
   let k = 0;
   for (const s of schedules) {
     if (s._count.audits > 0) continue; // keep started audits with their auditor
+    // Pick the next pool auditor who is not the PIC of this area.
+    let chosen = pool[k % pool.length];
+    for (let t = 0; t < pool.length; t++) {
+      const cand = pool[(k + t) % pool.length];
+      if (cand.areaId !== s.areaId) {
+        chosen = cand;
+        break;
+      }
+    }
     await db.auditSchedule.update({
       where: { id: s.id },
-      data: { auditorId: pool[k % pool.length] },
+      data: { auditorId: chosen.id },
     });
     k++;
   }

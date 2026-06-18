@@ -24,7 +24,7 @@ export default async function RedTagDetailPage({
   params: { id: string };
 }) {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "redtag")) redirect("/403");
+  if (!user || !canAccess(user.roles, "redtag")) redirect("/403");
 
   const tag = await db.redTag.findUnique({
     where: { id: params.id },
@@ -36,7 +36,7 @@ export default async function RedTagDetailPage({
   const locationLabel =
     LOCATION_OPTIONS.find((l) => l.value === tag.location)?.label ?? tag.location;
   const canDecide =
-    (user.role === "kord_red_tag" || user.role === "admin") &&
+    (user.roles.includes("kord_red_tag") || user.roles.includes("admin")) &&
     tag.status === "OPEN";
 
   return (

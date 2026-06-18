@@ -17,7 +17,7 @@ export default async function ScoreDetailPage({
   params: { id: string };
 }) {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "scores")) redirect("/403");
+  if (!user || !canAccess(user.roles, "scores")) redirect("/403");
 
   const area = await db.area.findUnique({ where: { id: params.id } });
   if (!area) notFound();

@@ -11,12 +11,16 @@ const PREFIX_ROLE: { prefix: string; role: Role }[] = [
   { prefix: "gm", role: "management" },
 ];
 
-export function emailToRole(email: string): Role | null {
+// Roles derived from an email prefix. Returns a (possibly empty) array — a user
+// can hold multiple roles, but the email prefix only ever implies one. Real
+// users carry their full role set in the DB (User.roles); this is the fallback
+// for virtual/mock users and the edge middleware.
+export function emailToRoles(email: string): Role[] {
   const local = email.trim().toLowerCase().split("@")[0] ?? "";
   for (const { prefix, role } of PREFIX_ROLE) {
-    if (local.startsWith(prefix)) return role;
+    if (local.startsWith(prefix)) return [role];
   }
-  return null;
+  return [];
 }
 
 // Bahasa Indonesia labels for each role (shown in UI).
@@ -31,6 +35,11 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export function roleLabel(role: Role): string {
   return ROLE_LABELS[role] ?? role;
+}
+
+// Joined labels for a user's full role set (e.g. "Auditor · Auditee / PIC Area").
+export function rolesLabel(roles: Role[]): string {
+  return roles.map(roleLabel).join(" · ") || "—";
 }
 
 // App sections used for navigation + access control.
@@ -60,8 +69,17 @@ export const SECTION_ACCESS: Record<Section, Role[]> = {
   admin: ["admin"],
 };
 
-export function canAccess(role: Role, section: Section): boolean {
-  return SECTION_ACCESS[section]?.includes(role) ?? false;
+// Access is the UNION across a user's roles: a section is allowed if ANY of the
+// user's roles grants it.
+export function canAccess(roles: Role[], section: Section): boolean {
+  const allowed = SECTION_ACCESS[section];
+  if (!allowed) return false;
+  return roles.some((r) => allowed.includes(r));
+}
+
+// True if the user holds at least one of the target roles.
+export function hasAnyRole(roles: Role[], ...targets: Role[]): boolean {
+  return roles.some((r) => targets.includes(r));
 }
 
 // Navigation items (pure data; icons attached in the UI layer).
@@ -80,9 +98,9 @@ export const NAV_ITEMS: NavItem[] = [
   { section: "admin", href: "/admin", label: "Admin" },
 ];
 
-// Nav items a given role is allowed to see.
-export function navForRole(role: Role): NavItem[] {
-  return NAV_ITEMS.filter((item) => canAccess(role, item.section));
+// Nav items a given set of roles is allowed to see.
+export function navForRoles(roles: Role[]): NavItem[] {
+  return NAV_ITEMS.filter((item) => canAccess(roles, item.section));
 }
 
 // Map a section to the roles allowed (used by middleware/route guards).

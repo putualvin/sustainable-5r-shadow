@@ -18,7 +18,7 @@ export default async function CapaInboxPage({
 
   // Auditee sees only their area; komite/admin see all.
   const auditWhere: Prisma.AuditWhereInput = { status: "SUBMITTED" };
-  if (user.role === "auditee") auditWhere.areaId = user.areaId ?? "__none__";
+  if (user.roles.includes("auditee")) auditWhere.areaId = user.areaId ?? "__none__";
 
   const findings = await db.finding.findMany({
     where: { audit: auditWhere },

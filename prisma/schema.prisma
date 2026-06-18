@@ -79,7 +79,9 @@ model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  role      Role     @default(auditee)
+  // A user may hold MULTIPLE roles (e.g. an area PIC who is also an auditor).
+  // Access is the union of all roles' permissions (see lib/rbac.ts).
+  roles     Role[]   @default([auditee])
   // PIC (auditee) is tied to one area; other roles leave this null.
   areaId    String?
   area      Area?    @relation(fields: [areaId], references: [id])

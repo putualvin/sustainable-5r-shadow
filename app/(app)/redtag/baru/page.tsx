@@ -10,7 +10,7 @@ import { RedTagForm } from "@/components/forms/redtag-form";
 
 export default async function RedTagNewPage() {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "redtag")) redirect("/403");
+  if (!user || !canAccess(user.roles, "redtag")) redirect("/403");
 
   const areas = await db.area.findMany({
     where: { active: true },

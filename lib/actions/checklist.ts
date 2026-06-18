@@ -16,7 +16,7 @@ function todayStr(): string {
 
 export async function submitChecklist(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "checklist")) redirect("/403");
+  if (!user || !canAccess(user.roles, "checklist")) redirect("/403");
 
   if (!user.areaId) redirect("/checklist");
   const area = await db.area.findUnique({ where: { id: user.areaId } });

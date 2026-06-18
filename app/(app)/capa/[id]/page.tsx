@@ -16,7 +16,7 @@ export default async function CapaDetailPage({
   params: { id: string };
 }) {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "capa")) redirect("/403");
+  if (!user || !canAccess(user.roles, "capa")) redirect("/403");
 
   const finding = await db.finding.findUnique({
     where: { id: params.id },
@@ -28,7 +28,7 @@ export default async function CapaDetailPage({
   });
   if (!finding) notFound();
 
-  if (user.role === "auditee" && finding.audit.areaId !== user.areaId) {
+  if (user.roles.includes("auditee") && finding.audit.areaId !== user.areaId) {
     redirect("/403");
   }
 

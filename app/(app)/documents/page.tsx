@@ -13,7 +13,7 @@ export default async function DocumentsPage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const canManage = user.role === "komite_unit" || user.role === "admin";
+  const canManage = user.roles.includes("komite_unit") || user.roles.includes("admin");
 
   const docs = await db.document.findMany({
     orderBy: [{ category: "asc" }, { title: "asc" }],

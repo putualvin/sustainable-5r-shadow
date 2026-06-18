@@ -12,7 +12,7 @@ export default async function AuditListPage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const isAuditor = user.role === "auditor";
+  const isAuditor = user.roles.includes("auditor");
   const scope = isAuditor ? { auditorId: user.id } : {};
 
   const [schedules, audits] = await Promise.all([

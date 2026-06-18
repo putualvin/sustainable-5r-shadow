@@ -51,7 +51,7 @@ export async function fillCapa(
   formData: FormData
 ): Promise<CapaActionState> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "capa")) return { error: "Akses ditolak." };
+  if (!user || !canAccess(user.roles, "capa")) return { error: "Akses ditolak." };
 
   const parsed = capaSchema.safeParse({
     findingId: formData.get("findingId"),
@@ -72,7 +72,7 @@ export async function fillCapa(
   if (!finding) return { error: "Temuan tidak ditemukan." };
 
   // Auditee may only fill CAPA for their own area.
-  if (user.role === "auditee" && finding.audit.areaId !== user.areaId) {
+  if (user.roles.includes("auditee") && finding.audit.areaId !== user.areaId) {
     return { error: "Anda hanya dapat mengisi CAPA untuk area Anda." };
   }
 

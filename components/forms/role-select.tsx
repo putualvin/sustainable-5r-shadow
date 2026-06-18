@@ -3,42 +3,50 @@
 import { useRef } from "react";
 import type { Role } from "@prisma/client";
 
-import { setUserRole } from "@/lib/actions/admin";
+import { setUserRoles } from "@/lib/actions/admin";
 import { ROLE_LABELS } from "@/lib/rbac";
-
-const selectClass =
-  "h-9 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
 
-// Inline role picker: changing the value submits the form (server action).
-export function RoleSelect({
+// Inline multi-role picker: toggling any checkbox submits the full set (server
+// action). A user may hold several roles at once (e.g. Auditor + Auditee).
+export function RolesSelect({
   userId,
-  role,
+  roles,
   disabled,
 }: {
   userId: string;
-  role: Role;
+  roles: Role[];
   disabled?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   return (
-    <form ref={formRef} action={setUserRole}>
+    <form ref={formRef} action={setUserRoles} className="flex flex-wrap gap-1.5">
       <input type="hidden" name="userId" value={userId} />
-      <select
-        name="role"
-        defaultValue={role}
-        disabled={disabled}
-        className={selectClass}
-        onChange={() => formRef.current?.requestSubmit()}
-        aria-label="Ubah peran"
-      >
-        {ROLES.map((r) => (
-          <option key={r} value={r}>
+      {ROLES.map((r) => {
+        const checked = roles.includes(r);
+        return (
+          <label
+            key={r}
+            className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
+              checked
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-input text-muted-foreground hover:border-primary/40"
+            } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+          >
+            <input
+              type="checkbox"
+              name="roles"
+              value={r}
+              defaultChecked={checked}
+              disabled={disabled}
+              className="sr-only"
+              onChange={() => formRef.current?.requestSubmit()}
+            />
             {ROLE_LABELS[r]}
-          </option>
-        ))}
-      </select>
+          </label>
+        );
+      })}
     </form>
   );
 }

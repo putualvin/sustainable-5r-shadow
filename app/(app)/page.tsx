@@ -9,7 +9,7 @@ import {
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { navForRole } from "@/lib/rbac";
+import { navForRoles } from "@/lib/rbac";
 import { gradeFor } from "@/lib/scoring";
 import { formatPeriod } from "@/lib/format";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -52,7 +52,7 @@ export default async function HomePage() {
         )
       : null;
 
-  const quickLinks = navForRole(user.role).filter((n) => n.section !== "home");
+  const quickLinks = navForRoles(user.roles).filter((n) => n.section !== "home");
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

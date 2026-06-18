@@ -27,7 +27,7 @@ export default async function SchedulePage({
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const canManage = user.role === "komite_unit" || user.role === "admin";
+  const canManage = user.roles.includes("komite_unit") || user.roles.includes("admin");
 
   // Periods that have schedules, plus the current month so a fresh period can
   // always be generated.

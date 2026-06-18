@@ -19,7 +19,7 @@ export async function createRedTag(
   formData: FormData
 ): Promise<RedTagActionState> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "redtag")) return { error: "Akses ditolak." };
+  if (!user || !canAccess(user.roles, "redtag")) return { error: "Akses ditolak." };
 
   const parsed = redTagSchema.safeParse({
     areaId: formData.get("areaId"),
@@ -69,7 +69,7 @@ export async function createRedTag(
 // Disposal decision — coordinator only.
 export async function decideRedTag(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || (user.role !== "kord_red_tag" && user.role !== "admin")) {
+  if (!user || (!user.roles.includes("kord_red_tag") && !user.roles.includes("admin"))) {
     redirect("/403");
   }
 

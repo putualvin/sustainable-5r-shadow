@@ -121,7 +121,10 @@ export function LoginForm() {
 
         <div>
           <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-            PIC Area (Auditee)
+            PIC Area (Auditee) ·{" "}
+            <span className="font-normal">
+              PIC Fraksinasi Lt 1 merangkap Auditor (contoh multi-peran)
+            </span>
           </p>
           <ul className="grid max-h-44 grid-cols-1 gap-1 overflow-y-auto rounded-md border p-1.5 sm:grid-cols-2">
             {AREA_PICS.map((a) => {

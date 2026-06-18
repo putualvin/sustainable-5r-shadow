@@ -20,8 +20,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import type { Role } from "@prisma/client";
 import type { NavItem, Section } from "@/lib/rbac";
-import { roleLabel } from "@/lib/rbac";
+import { rolesLabel } from "@/lib/rbac";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ export function AppShell({
   items,
   children,
 }: {
-  user: { name: string; email: string; role: Parameters<typeof roleLabel>[0] };
+  user: { name: string; email: string; roles: Role[] };
   items: NavItem[];
   children: React.ReactNode;
 }) {
@@ -181,7 +182,7 @@ export function AppShell({
 function UserBox({
   user,
 }: {
-  user: { name: string; email: string; role: Parameters<typeof roleLabel>[0] };
+  user: { name: string; email: string; roles: Role[] };
 }) {
   return (
     <div className="border-t p-3">
@@ -192,7 +193,7 @@ function UserBox({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{user.name}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {roleLabel(user.role)}
+            {rolesLabel(user.roles)}
           </p>
         </div>
       </div>

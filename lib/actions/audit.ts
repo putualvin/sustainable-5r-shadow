@@ -13,14 +13,14 @@ import { findingSchema } from "@/lib/schemas/finding";
 // Start an audit from a schedule entry (auditor for that schedule, or komite/admin).
 export async function startAuditFromSchedule(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "audit")) redirect("/403");
+  if (!user || !canAccess(user.roles, "audit")) redirect("/403");
 
   const scheduleId = String(formData.get("scheduleId") ?? "");
   const schedule = await db.auditSchedule.findUnique({ where: { id: scheduleId } });
   if (!schedule) redirect("/audit");
 
   // Auditors may only start their own scheduled audits.
-  if (user!.role === "auditor" && schedule!.auditorId !== user!.id) {
+  if (user!.roles.includes("auditor") && schedule!.auditorId !== user!.id) {
     redirect("/403");
   }
 
@@ -49,7 +49,7 @@ export async function addFinding(
   formData: FormData
 ): Promise<FindingActionState> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "audit")) return { error: "Akses ditolak." };
+  if (!user || !canAccess(user.roles, "audit")) return { error: "Akses ditolak." };
 
   const parsed = findingSchema.safeParse({
     auditId: formData.get("auditId"),
@@ -85,7 +85,7 @@ export async function addFinding(
 
 export async function deleteFinding(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "audit")) redirect("/403");
+  if (!user || !canAccess(user.roles, "audit")) redirect("/403");
 
   const id = String(formData.get("findingId") ?? "");
   const auditId = String(formData.get("auditId") ?? "");
@@ -99,7 +99,7 @@ export async function deleteFinding(formData: FormData): Promise<void> {
 // Submit final: lock the audit and distribute findings to the area PIC.
 export async function submitAudit(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "audit")) redirect("/403");
+  if (!user || !canAccess(user.roles, "audit")) redirect("/403");
 
   const auditId = String(formData.get("auditId") ?? "");
   const audit = await db.audit.findUnique({

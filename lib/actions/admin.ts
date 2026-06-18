@@ -6,7 +6,7 @@ import type { Role } from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { canAccess, roleLabel } from "@/lib/rbac";
+import { canAccess, rolesLabel } from "@/lib/rbac";
 import { logAction } from "@/lib/audit-log";
 
 const ROLES: Role[] = [
@@ -18,26 +18,31 @@ const ROLES: Role[] = [
   "management",
 ];
 
-export async function setUserRole(formData: FormData): Promise<void> {
+// Set a user's full role set (one or more roles). A user may hold several
+// roles at once — e.g. an area PIC (auditee) who also serves as an auditor.
+export async function setUserRoles(formData: FormData): Promise<void> {
   const actor = await getCurrentUser();
-  if (!actor || !canAccess(actor.role, "admin")) redirect("/403");
+  if (!actor || !canAccess(actor.roles, "admin")) redirect("/403");
 
   const userId = String(formData.get("userId") ?? "");
-  const role = String(formData.get("role") ?? "") as Role;
-  if (!ROLES.includes(role)) redirect("/admin?error=role");
+  const roles = formData
+    .getAll("roles")
+    .map(String)
+    .filter((r): r is Role => ROLES.includes(r as Role));
+  if (roles.length === 0) redirect("/admin?error=role");
 
-  // Guard against an admin locking themselves out of admin.
-  if (userId === actor.id && role !== "admin") {
+  // Guard against an admin removing their own admin role (lockout safety).
+  if (userId === actor.id && !roles.includes("admin")) {
     redirect("/admin?error=self-demote");
   }
 
   const target = await db.user.findUnique({ where: { id: userId } });
-  if (target && target.role !== role) {
-    await db.user.update({ where: { id: userId }, data: { role } });
+  if (target) {
+    await db.user.update({ where: { id: userId }, data: { roles } });
     await logAction({
       action: "user.role.update",
       entity: "User",
-      summary: `Mengubah peran ${target.name} dari ${roleLabel(target.role)} menjadi ${roleLabel(role)}.`,
+      summary: `Mengubah peran ${target.name} dari ${rolesLabel(target.roles)} menjadi ${rolesLabel(roles)}.`,
     });
   }
   revalidatePath("/admin");
@@ -45,7 +50,7 @@ export async function setUserRole(formData: FormData): Promise<void> {
 
 export async function toggleUserActive(formData: FormData): Promise<void> {
   const actor = await getCurrentUser();
-  if (!actor || !canAccess(actor.role, "admin")) redirect("/403");
+  if (!actor || !canAccess(actor.roles, "admin")) redirect("/403");
 
   const userId = String(formData.get("userId") ?? "");
   if (userId === actor.id) redirect("/admin?error=self-deactivate");

@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 import { toggleUserActive } from "@/lib/actions/admin";
-import { RoleSelect } from "@/components/forms/role-select";
+import { RolesSelect } from "@/components/forms/role-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -25,7 +25,7 @@ export default async function AdminPage({
   const [users, logs] = await Promise.all([
     db.user.findMany({
       include: { area: { select: { name: true } } },
-      orderBy: [{ role: "asc" }, { name: "asc" }],
+      orderBy: { name: "asc" },
     }),
     db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
@@ -83,7 +83,7 @@ export default async function AdminPage({
                         {u.area?.name ?? "—"}
                       </td>
                       <td className="px-3 py-2">
-                        <RoleSelect userId={u.id} role={u.role} disabled={isSelf} />
+                        <RolesSelect userId={u.id} roles={u.roles} disabled={isSelf} />
                       </td>
                       <td className="px-6 py-2 text-right">
                         <form action={toggleUserActive} className="inline">
