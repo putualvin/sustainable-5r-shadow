@@ -309,15 +309,39 @@ async function main() {
       { gq: pick("SOP"), location: "Panel kontrol", description: "SOP 5R tidak terpasang/usang." },
       { gq: pick("Promosi 5R"), location: "Dinding lorong", description: "Tidak ada slogan/visual budaya 5R." },
     ];
+    const createdFindings = [];
     for (const f of findingSeeds) {
-      await db.finding.create({
-        data: {
-          auditId: audit.id,
-          guidingQuestionId: f.gq.id,
-          locationDetail: f.location,
-          description: f.description,
-          status: "PENDING_CAPA",
-        },
+      createdFindings.push(
+        await db.finding.create({
+          data: {
+            auditId: audit.id,
+            guidingQuestionId: f.gq.id,
+            locationDetail: f.location,
+            description: f.description,
+            status: "PENDING_CAPA",
+          },
+        })
+      );
+    }
+
+    // The auditee has filled CAPA for the first 2 findings — status left null
+    // so they sit in the Komite's "Menunggu Verifikasi" queue (the auditee does
+    // NOT set the closing status; Komite does during verification).
+    const capaSeeds = [
+      {
+        rootCause: "Seal pompa P-101 bocor sehingga oli menetes ke lantai.",
+        correctiveAction: "Membersihkan ceceran dan mengganti seal pompa.",
+        preventiveAction: "Menjadwalkan inspeksi seal pompa setiap minggu.",
+      },
+      {
+        rootCause: "Garis demarkasi pudar dan drum tidak dikembalikan ke tempatnya.",
+        correctiveAction: "Mengecat ulang garis dan menata ulang drum.",
+        preventiveAction: "Audit penataan harian oleh PIC shift.",
+      },
+    ];
+    for (let i = 0; i < capaSeeds.length; i++) {
+      await db.capa.create({
+        data: { findingId: createdFindings[i].id, ...capaSeeds[i] },
       });
     }
   }

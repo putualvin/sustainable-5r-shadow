@@ -1,10 +1,8 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
-import type { CapaStatus } from "@prisma/client";
 
 import { fillCapa, type CapaActionState } from "@/lib/actions/capa";
-import { CAPA_STATUS_OPTIONS } from "@/components/shared/capa-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,12 +13,8 @@ type Defaults = {
   rootCause: string;
   correctiveAction: string;
   preventiveAction: string;
-  status: CapaStatus;
   dueDate: string; // yyyy-MM-dd or ""
 };
-
-const selectClass =
-  "flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 export function CapaForm({
   findingId,
@@ -68,37 +62,25 @@ export function CapaForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="status">Status</Label>
-          <select
-            id="status"
-            name="status"
-            defaultValue={defaults.status}
-            className={selectClass}
-          >
-            {CAPA_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="dueDate">Target Selesai (opsional)</Label>
-          <Input
-            id="dueDate"
-            name="dueDate"
-            type="date"
-            defaultValue={defaults.dueDate}
-          />
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="dueDate">Target Selesai (opsional)</Label>
+        <Input
+          id="dueDate"
+          name="dueDate"
+          type="date"
+          defaultValue={defaults.dueDate}
+        />
       </div>
 
       <div className="space-y-2">
         <Label>Foto Sesudah / After (opsional)</Label>
         <PhotoInput name="afterPhoto" />
       </div>
+
+      <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+        Status penyelesaian (Selesai / Proses / Belum Ada) ditetapkan oleh Komite
+        Unit saat verifikasi — bukan diisi di sini.
+      </p>
 
       {state?.error && (
         <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">

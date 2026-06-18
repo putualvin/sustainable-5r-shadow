@@ -5,20 +5,22 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { canAccess } from "@/lib/rbac";
+import { canAccess, hasAnyRole } from "@/lib/rbac";
 import { savePhoto } from "@/lib/upload";
 import { calculate5RScore } from "@/lib/scoring";
-import { capaSchema } from "@/lib/schemas/capa";
+import { logAction } from "@/lib/audit-log";
+import { capaSchema, verifyCapaSchema } from "@/lib/schemas/capa";
 
 // Recompute and persist an area's score for a period from its CAPA statuses.
-// Only findings that already have a CAPA are counted (the rest are not yet
-// evaluated). Uses the single scoring engine — never inline the math.
+// Only findings whose CAPA has been VERIFIED by Komite (status not null) are
+// counted; unverified CAPAs are "not yet evaluated". Uses the single scoring
+// engine — never inline the math.
 export async function recomputeAreaScore(
   areaId: string,
   period: string
 ): Promise<void> {
   const findings = await db.finding.findMany({
-    where: { audit: { areaId, period }, capa: { isNot: null } },
+    where: { audit: { areaId, period }, capa: { status: { not: null } } },
     select: { capa: { select: { status: true } } },
   });
 
@@ -46,6 +48,8 @@ export async function recomputeAreaScore(
 
 export type CapaActionState = { error?: string };
 
+// Auditee fills (or updates) the CAPA plan. NO status here — that is set by
+// Komite during verification. A CAPA that has already been verified is locked.
 export async function fillCapa(
   _prev: CapaActionState,
   formData: FormData
@@ -58,7 +62,6 @@ export async function fillCapa(
     rootCause: formData.get("rootCause"),
     correctiveAction: formData.get("correctiveAction"),
     preventiveAction: formData.get("preventiveAction"),
-    status: formData.get("status"),
     dueDate: formData.get("dueDate") || undefined,
   });
   if (!parsed.success) {
@@ -67,13 +70,21 @@ export async function fillCapa(
 
   const finding = await db.finding.findUnique({
     where: { id: parsed.data.findingId },
-    include: { audit: { select: { areaId: true, period: true } } },
+    include: {
+      capa: { select: { status: true } },
+      audit: { select: { areaId: true, period: true } },
+    },
   });
   if (!finding) return { error: "Temuan tidak ditemukan." };
 
   // Auditee may only fill CAPA for their own area.
   if (user.roles.includes("auditee") && finding.audit.areaId !== user.areaId) {
     return { error: "Anda hanya dapat mengisi CAPA untuk area Anda." };
+  }
+
+  // Once verified by Komite the CAPA is locked.
+  if (finding.capa && finding.capa.status !== null) {
+    return { error: "CAPA sudah diverifikasi Komite dan tidak dapat diubah." };
   }
 
   const photo = formData.get("afterPhoto");
@@ -86,7 +97,6 @@ export async function fillCapa(
       rootCause: parsed.data.rootCause,
       correctiveAction: parsed.data.correctiveAction,
       preventiveAction: parsed.data.preventiveAction,
-      status: parsed.data.status,
       dueDate,
       ...(afterPhoto ? { afterPhoto } : {}),
     },
@@ -95,17 +105,58 @@ export async function fillCapa(
       rootCause: parsed.data.rootCause,
       correctiveAction: parsed.data.correctiveAction,
       preventiveAction: parsed.data.preventiveAction,
-      status: parsed.data.status,
       dueDate,
       afterPhoto,
+      // status left null — awaiting Komite verification.
     },
   });
 
-  // Recompute the area score immediately.
+  revalidatePath("/capa");
+  redirect("/capa?saved=1");
+}
+
+// Komite Unit (or admin) verifies a CAPA by setting its closing status. This is
+// what drives the area score — the auditee never sets it.
+export async function verifyCapa(formData: FormData): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || !hasAnyRole(user.roles, "komite_unit", "admin")) redirect("/403");
+
+  const parsed = verifyCapaSchema.safeParse({
+    findingId: formData.get("findingId"),
+    status: formData.get("status"),
+  });
+  if (!parsed.success) redirect("/capa");
+
+  const finding = await db.finding.findUnique({
+    where: { id: parsed.data.findingId },
+    include: {
+      capa: { select: { id: true } },
+      audit: { select: { areaId: true, period: true, area: { select: { name: true } } } },
+    },
+  });
+  // Can only verify a CAPA the auditee has actually filled.
+  if (!finding || !finding.capa) redirect("/capa");
+
+  await db.capa.update({
+    where: { findingId: parsed.data.findingId },
+    data: {
+      status: parsed.data.status,
+      verifiedAt: new Date(),
+      verifiedBy: user.name,
+    },
+  });
+
   await recomputeAreaScore(finding.audit.areaId, finding.audit.period);
 
+  await logAction({
+    action: "capa.verify",
+    entity: "Capa",
+    summary: `Verifikasi CAPA ${finding.audit.area.name} → ${parsed.data.status}.`,
+  });
+
   revalidatePath("/capa");
+  revalidatePath(`/capa/${parsed.data.findingId}`);
   revalidatePath("/scores");
   revalidatePath("/");
-  redirect("/capa?saved=1");
+  redirect(`/capa/${parsed.data.findingId}?verified=1`);
 }

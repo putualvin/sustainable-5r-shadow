@@ -242,3 +242,19 @@ Format:
 - Requires PostgreSQL (enum arrays aren't supported on SQLite), so the local SQLite preview path no longer applies to this feature — verification is via unit tests (RBAC, no DB) + build + the live Neon deploy.
 - The deploy's `prisma db push` now uses `--accept-data-loss` (dropping the old `role` column); the idempotent seed repopulates all users, so no meaningful data is lost in this shadow build.
 - Diverges from the single-role model implied in CLAUDE.md — an intentional enhancement; the 6 roles and the `SECTION_ACCESS` map are unchanged.
+
+---
+
+## 2026-06-16 — CAPA status is set by Komite Unit (verification), not the auditee
+
+**Context:** Business correction from the owner: the auditee/PIC fills the CAPA *plan*, but the **closing status** (Done / Progress / No Progress) — which drives the score — is the **Komite Unit's** decision during verification. The shadow build had previously let the auditee pick the status directly.
+
+**Decision:**
+1. `Capa.status` is now **nullable** (`CapaStatus?`); null = "Menunggu Verifikasi". Added `verifiedAt` + `verifiedBy` (denormalized).
+2. **Auditee** form (`fillCapa`) no longer has a status field — only root cause, corrective, preventive, due date, after-photo.
+3. **Komite/admin** verify via a new `verifyCapa` action (3 status buttons on the CAPA detail). Verifying sets the status + verifier + timestamp and **recomputes the area score**.
+4. **Score counts only VERIFIED CAPAs** (`recomputeAreaScore` filters `capa.status != null`). Unverified CAPAs are "not yet evaluated".
+5. **Lock after verification:** once Komite verifies, the auditee can no longer edit that CAPA (`fillCapa` rejects an edit when `status != null`); the detail page shows it read-only. (Per the owner: a verified CAPA isn't edited; scoring stands on it.)
+6. **Inbox** is role-aware: auditee sees *Perlu Diisi / Menunggu Verifikasi / Terverifikasi*; Komite sees a *Menunggu Verifikasi* action queue + *Terverifikasi* + *Belum Diisi Auditee*.
+
+**Consequences:** Recompute is now triggered by Komite verification (not auditee save) — matching the real workflow. Seed gives REF-2 two filled-but-unverified CAPAs so the Komite queue is non-empty. This realises the "Komite verify CAPA" step previously deferred in the Module 3 note.
