@@ -191,6 +191,19 @@ async function main() {
     });
   }
 
+  // A PIC (auditee) account per area so every audited area has a receiver for
+  // its findings (audit -> CAPA loop works for all 12 areas, not just REF-2).
+  // Email convention: pic.<area-code>@5r.local (prefix "pic" -> auditee role).
+  const allAreasForPic = await db.area.findMany({ orderBy: { code: "asc" } });
+  for (const area of allAreasForPic) {
+    const email = `pic.${area.code.toLowerCase()}@5r.local`;
+    await db.user.upsert({
+      where: { email },
+      update: { name: `PIC ${area.name}`, role: "auditee", areaId: area.id },
+      create: { email, name: `PIC ${area.name}`, role: "auditee", areaId: area.id },
+    });
+  }
+
   // Scores for the current period
   const period = currentPeriod();
   for (const t of SCORE_TALLIES) {
