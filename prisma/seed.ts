@@ -309,24 +309,28 @@ async function main() {
       { gq: pick("SOP"), location: "Panel kontrol", description: "SOP 5R tidak terpasang/usang." },
       { gq: pick("Promosi 5R"), location: "Dinding lorong", description: "Tidak ada slogan/visual budaya 5R." },
     ];
-    const createdFindings = [];
     for (const f of findingSeeds) {
-      createdFindings.push(
-        await db.finding.create({
-          data: {
-            auditId: audit.id,
-            guidingQuestionId: f.gq.id,
-            locationDetail: f.location,
-            description: f.description,
-            status: "PENDING_CAPA",
-          },
-        })
-      );
+      await db.finding.create({
+        data: {
+          auditId: audit.id,
+          guidingQuestionId: f.gq.id,
+          locationDetail: f.location,
+          description: f.description,
+          status: "PENDING_CAPA",
+        },
+      });
     }
+  }
 
-    // The auditee has filled CAPA for the first 2 findings — status left null
-    // so they sit in the Komite's "Menunggu Verifikasi" queue (the auditee does
-    // NOT set the closing status; Komite does during verification).
+  // The auditee has filled CAPA for 2 REF-2 findings — status left null so they
+  // sit in the Komite's "Menunggu Verifikasi" queue (the auditee does NOT set
+  // the closing status; Komite does during verification). Seeded once.
+  if (ref2 && (await db.capa.count({ where: { finding: { audit: { areaId: ref2.id } } } })) === 0) {
+    const ref2Findings = await db.finding.findMany({
+      where: { audit: { areaId: ref2.id }, capa: { is: null } },
+      orderBy: { createdAt: "asc" },
+      take: 2,
+    });
     const capaSeeds = [
       {
         rootCause: "Seal pompa P-101 bocor sehingga oli menetes ke lantai.",
@@ -339,9 +343,9 @@ async function main() {
         preventiveAction: "Audit penataan harian oleh PIC shift.",
       },
     ];
-    for (let i = 0; i < capaSeeds.length; i++) {
+    for (let i = 0; i < ref2Findings.length && i < capaSeeds.length; i++) {
       await db.capa.create({
-        data: { findingId: createdFindings[i].id, ...capaSeeds[i] },
+        data: { findingId: ref2Findings[i].id, ...capaSeeds[i] },
       });
     }
   }
