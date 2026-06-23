@@ -7,42 +7,46 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccess, hasAnyRole } from "@/lib/rbac";
 import { savePhoto } from "@/lib/upload";
-import { calculate5RScore } from "@/lib/scoring";
+import { calculateFinalScore } from "@/lib/scoring";
 import { logAction } from "@/lib/audit-log";
 import { capaSchema, verifyCapaSchema } from "@/lib/schemas/capa";
 
-// Recompute and persist an area's score for a period from its CAPA statuses.
-// Only findings whose CAPA has been VERIFIED by Komite (status not null) are
-// counted; unverified CAPAs are "not yet evaluated". Uses the single scoring
-// engine — never inline the math.
+// Recompute and persist an area's two-layer score (§5.4) for a period.
+// Status counts come from VERIFIED CAPAs only (Komite-set); Temuan Berulang is
+// the count of findings flagged isRecurring. Uses the single scoring engine —
+// never inline the math.
 export async function recomputeAreaScore(
   areaId: string,
   period: string
 ): Promise<void> {
   const findings = await db.finding.findMany({
-    where: { audit: { areaId, period }, capa: { status: { not: null } } },
-    select: { capa: { select: { status: true } } },
+    where: { audit: { areaId, period } },
+    select: { isRecurring: true, capa: { select: { status: true } } },
   });
 
   const done = findings.filter((f) => f.capa?.status === "DONE").length;
   const progress = findings.filter((f) => f.capa?.status === "PROGRESS").length;
   const noProgress = findings.filter((f) => f.capa?.status === "NO_PROGRESS").length;
+  const recurring = findings.filter((f) => f.isRecurring).length;
 
-  if (done + progress + noProgress === 0) return;
+  if (done + progress + noProgress === 0) return; // nothing evaluated yet
 
-  const { finalScore } = calculate5RScore({ done, progress, noProgress });
+  const s = calculateFinalScore({ done, progress, noProgress, recurring });
+
+  const data = {
+    countDone: done,
+    countProgress: progress,
+    countNoProgress: noProgress,
+    nilaiUtama: s.nilaiUtama,
+    temuanBerulang: s.temuanBerulang,
+    parkingLot: s.parkingLot,
+    finalScore: s.scoreAkhir,
+  };
 
   await db.score.upsert({
     where: { areaId_period: { areaId, period } },
-    update: { countDone: done, countProgress: progress, countNoProgress: noProgress, finalScore },
-    create: {
-      areaId,
-      period,
-      countDone: done,
-      countProgress: progress,
-      countNoProgress: noProgress,
-      finalScore,
-    },
+    update: data,
+    create: { areaId, period, ...data },
   });
 }
 

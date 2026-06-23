@@ -8,6 +8,9 @@ export const findingSchema = z.object({
     .string()
     .min(3, "Deskripsi temuan minimal 3 karakter")
     .max(1000, "Deskripsi terlalu panjang"),
+  // Auditor assigns the category (§5.1) — NOT the closing status.
+  kategori: z.enum(["LOW", "HIGH"], { message: "Pilih kategori Low/High" }),
+  isRecurring: z.boolean().optional(),
 });
 
 export type FindingInput = z.infer<typeof findingSchema>;

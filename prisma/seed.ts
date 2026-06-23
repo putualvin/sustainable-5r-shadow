@@ -5,7 +5,7 @@ import {
   type Pillar,
   type Role,
 } from "@prisma/client";
-import { calculate5RScore } from "../lib/scoring";
+import { calculateFinalScore } from "../lib/scoring";
 import { RETENTION_DAYS } from "../lib/redtag";
 
 const db = new PrismaClient();
@@ -57,19 +57,20 @@ const SCORE_TALLIES: {
   done: number;
   progress: number;
   noProgress: number;
+  recurring: number; // temuan berulang (§5.4) — pengurang Score Akhir
 }[] = [
-  { code: "REF-1", done: 17, progress: 3, noProgress: 1 },
-  { code: "REF-2", done: 20, progress: 2, noProgress: 0 },
-  { code: "REF-3", done: 12, progress: 5, noProgress: 4 },
-  { code: "FRA-1", done: 15, progress: 4, noProgress: 2 },
-  { code: "FRA-2", done: 18, progress: 2, noProgress: 1 },
-  { code: "FRA-3", done: 10, progress: 6, noProgress: 3 },
-  { code: "STG", done: 19, progress: 2, noProgress: 1 },
-  { code: "LDB", done: 14, progress: 5, noProgress: 3 },
-  { code: "CTR", done: 16, progress: 3, noProgress: 2 },
-  { code: "WSH", done: 13, progress: 4, noProgress: 3 },
-  { code: "OFF", done: 19, progress: 3, noProgress: 0 },
-  { code: "LAB", done: 17, progress: 4, noProgress: 1 },
+  { code: "REF-1", done: 17, progress: 3, noProgress: 1, recurring: 1 },
+  { code: "REF-2", done: 20, progress: 2, noProgress: 0, recurring: 1 },
+  { code: "REF-3", done: 12, progress: 5, noProgress: 4, recurring: 3 },
+  { code: "FRA-1", done: 15, progress: 4, noProgress: 2, recurring: 2 },
+  { code: "FRA-2", done: 18, progress: 2, noProgress: 1, recurring: 1 },
+  { code: "FRA-3", done: 10, progress: 6, noProgress: 3, recurring: 2 },
+  { code: "STG", done: 19, progress: 2, noProgress: 1, recurring: 0 },
+  { code: "LDB", done: 14, progress: 5, noProgress: 3, recurring: 2 },
+  { code: "CTR", done: 16, progress: 3, noProgress: 2, recurring: 1 },
+  { code: "WSH", done: 13, progress: 4, noProgress: 3, recurring: 2 },
+  { code: "OFF", done: 19, progress: 3, noProgress: 0, recurring: 0 },
+  { code: "LAB", done: 17, progress: 4, noProgress: 1, recurring: 1 },
 ];
 
 // Daily Checklist items per parent group (from AppSheet documentation, verbatim).
@@ -208,38 +209,35 @@ async function main() {
     });
   }
 
-  // Scores for the current period
+  // Scores for the current period (two-layer §5.4 via lib/scoring.ts).
   const period = currentPeriod();
   for (const t of SCORE_TALLIES) {
     const area = await db.area.findUnique({ where: { code: t.code } });
     if (!area) continue;
-    const { finalScore } = calculate5RScore({
+    const s = calculateFinalScore({
       done: t.done,
       progress: t.progress,
       noProgress: t.noProgress,
+      recurring: t.recurring,
     });
+    const data = {
+      countDone: t.done,
+      countProgress: t.progress,
+      countNoProgress: t.noProgress,
+      nilaiUtama: s.nilaiUtama,
+      temuanBerulang: s.temuanBerulang,
+      parkingLot: s.parkingLot,
+      finalScore: s.scoreAkhir,
+    };
     await db.score.upsert({
       where: { areaId_period: { areaId: area.id, period } },
-      update: {
-        countDone: t.done,
-        countProgress: t.progress,
-        countNoProgress: t.noProgress,
-        finalScore,
-      },
-      create: {
-        areaId: area.id,
-        period,
-        countDone: t.done,
-        countProgress: t.progress,
-        countNoProgress: t.noProgress,
-        finalScore,
-      },
+      update: data,
+      create: { areaId: area.id, period, ...data },
     });
   }
 
   // Score history for the 2 previous periods so the monthly report trend and
-  // "vs last month" deltas are meaningful. Older months trend slightly lower
-  // (some Done shifted to Progress/No Progress) → a gentle upward trend.
+  // "vs last month" deltas are meaningful. Older months trend slightly lower.
   for (const offset of [2, 1]) {
     const histPeriod = periodMonthsAgo(offset);
     for (const t of SCORE_TALLIES) {
@@ -248,18 +246,20 @@ async function main() {
       const done = Math.max(0, t.done - offset * 2);
       const progress = t.progress + offset;
       const noProgress = t.noProgress + offset;
-      const { finalScore } = calculate5RScore({ done, progress, noProgress });
+      const s = calculateFinalScore({ done, progress, noProgress, recurring: t.recurring });
+      const data = {
+        countDone: done,
+        countProgress: progress,
+        countNoProgress: noProgress,
+        nilaiUtama: s.nilaiUtama,
+        temuanBerulang: s.temuanBerulang,
+        parkingLot: s.parkingLot,
+        finalScore: s.scoreAkhir,
+      };
       await db.score.upsert({
         where: { areaId_period: { areaId: area.id, period: histPeriod } },
-        update: { countDone: done, countProgress: progress, countNoProgress: noProgress, finalScore },
-        create: {
-          areaId: area.id,
-          period: histPeriod,
-          countDone: done,
-          countProgress: progress,
-          countNoProgress: noProgress,
-          finalScore,
-        },
+        update: data,
+        create: { areaId: area.id, period: histPeriod, ...data },
       });
     }
   }
@@ -303,11 +303,11 @@ async function main() {
       },
     });
     const findingSeeds = [
-      { gq: pick("Lantai"), location: "Dekat pompa P-101", description: "Ceceran oli di lantai area pompa." },
-      { gq: pick("Garis Demarkasi"), location: "Area drum", description: "Drum diletakkan di luar garis demarkasi." },
-      { gq: pick("Material dan atau Suku cadang"), location: "Rak B2", description: "Material tidak terpakai menumpuk di rak." },
-      { gq: pick("SOP"), location: "Panel kontrol", description: "SOP 5R tidak terpasang/usang." },
-      { gq: pick("Promosi 5R"), location: "Dinding lorong", description: "Tidak ada slogan/visual budaya 5R." },
+      { gq: pick("Lantai"), location: "Dekat pompa P-101", description: "Ceceran oli di lantai area pompa.", kategori: "HIGH" as const, isRecurring: true },
+      { gq: pick("Garis Demarkasi"), location: "Area drum", description: "Drum diletakkan di luar garis demarkasi.", kategori: "LOW" as const, isRecurring: false },
+      { gq: pick("Material dan atau Suku cadang"), location: "Rak B2", description: "Material tidak terpakai menumpuk di rak.", kategori: "LOW" as const, isRecurring: false },
+      { gq: pick("SOP"), location: "Panel kontrol", description: "SOP 5R tidak terpasang/usang.", kategori: "HIGH" as const, isRecurring: false },
+      { gq: pick("Promosi 5R"), location: "Dinding lorong", description: "Tidak ada slogan/visual budaya 5R.", kategori: "LOW" as const, isRecurring: false },
     ];
     for (const f of findingSeeds) {
       await db.finding.create({
@@ -316,6 +316,8 @@ async function main() {
           guidingQuestionId: f.gq.id,
           locationDetail: f.location,
           description: f.description,
+          kategori: f.kategori,
+          isRecurring: f.isRecurring,
           status: "PENDING_CAPA",
         },
       });

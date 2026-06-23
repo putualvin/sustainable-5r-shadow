@@ -27,8 +27,17 @@ type Draft = {
   gqId: string;
   locationDetail: string;
   description: string;
+  kategori: "LOW" | "HIGH" | "";
+  isRecurring: boolean;
 };
-const EMPTY: Draft = { pillar: "", gqId: "", locationDetail: "", description: "" };
+const EMPTY: Draft = {
+  pillar: "",
+  gqId: "",
+  locationDetail: "",
+  description: "",
+  kategori: "",
+  isRecurring: false,
+};
 
 const selectClass =
   "flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
@@ -141,6 +150,39 @@ export function AddFindingForm({
             setDraft((d) => ({ ...d, description: e.target.value }))
           }
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="kategori">Kategori temuan</Label>
+          <select
+            id="kategori"
+            name="kategori"
+            className={selectClass}
+            value={draft.kategori}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, kategori: e.target.value as "LOW" | "HIGH" }))
+            }
+          >
+            <option value="">Pilih kategori…</option>
+            <option value="LOW">Low</option>
+            <option value="HIGH">High</option>
+          </select>
+        </div>
+        <div className="flex items-end">
+          <label className="flex h-11 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
+            <input
+              type="checkbox"
+              name="isRecurring"
+              checked={draft.isRecurring}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, isRecurring: e.target.checked }))
+              }
+              className="h-4 w-4"
+            />
+            Temuan berulang (bulan lalu &amp; ini)
+          </label>
+        </div>
       </div>
 
       <div className="space-y-2">

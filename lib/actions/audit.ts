@@ -56,6 +56,8 @@ export async function addFinding(
     guidingQuestionId: formData.get("guidingQuestionId"),
     locationDetail: formData.get("locationDetail") || undefined,
     description: formData.get("description"),
+    kategori: formData.get("kategori"),
+    isRecurring: formData.get("isRecurring") === "on",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
@@ -75,6 +77,8 @@ export async function addFinding(
       guidingQuestionId: parsed.data.guidingQuestionId,
       locationDetail: parsed.data.locationDetail ?? null,
       description: parsed.data.description,
+      kategori: parsed.data.kategori,
+      isRecurring: parsed.data.isRecurring ?? false,
       photoPath,
     },
   });

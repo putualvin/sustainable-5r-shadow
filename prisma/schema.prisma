@@ -39,6 +39,12 @@ enum FindingStatus {
   PENDING_CAPA
 }
 
+// Auditor-assigned category of a finding (§5.1). NOT the closing status.
+enum Kategori {
+  LOW
+  HIGH
+}
+
 // CAPA closing status — drives the area score (see lib/scoring.ts).
 enum CapaStatus {
   DONE
@@ -118,7 +124,11 @@ model Score {
   countDone       Int      @default(0)
   countProgress   Int      @default(0)
   countNoProgress Int      @default(0)
-  finalScore      Int      @default(0) // computed via lib/scoring.ts
+  // Two-layer scoring (§5.4), all computed via lib/scoring.ts:
+  nilaiUtama      Int      @default(0) // Lapis 1
+  temuanBerulang  Int      @default(0) // count recurring (−1 each)
+  parkingLot      Int      @default(0) // count Not-Done (tracking; weight 0)
+  finalScore      Int      @default(0) // Score Akhir (Lapis 2)
   createdAt       DateTime @default(now())
 
   @@unique([areaId, period])
@@ -187,6 +197,8 @@ model Finding {
   guidingQuestionId String
   locationDetail    String? // specific spot within the area
   description       String
+  kategori          Kategori        @default(LOW) // auditor-assigned (§5.1)
+  isRecurring       Boolean         @default(false) // temuan berulang (§5.4)
   photoPath         String? // /uploads/...
   status            FindingStatus   @default(DRAFT)
   createdAt         DateTime        @default(now())
