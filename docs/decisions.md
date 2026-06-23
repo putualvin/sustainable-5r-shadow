@@ -271,3 +271,25 @@ Format:
 - `createRedTag` anchors the area to the finding's area when raised from a finding (consistency). Auditees may only raise from a finding in their own area.
 
 **Consequences:** Scoring is untouched — the link is informational/navigational. Seed links one REF-2 red tag to the "Material/Suku cadang" finding to demo the flow.
+
+---
+
+## 2026-06-16 — Re-baseline to BRD-aligned CLAUDE.md (align existing app)
+
+**Context:** Owner replaced CLAUDE.md with a more detailed, BRD-aligned spec ("lupakan semuanya") and chose to **align the existing app** (not restart) and **keep PostgreSQL/Neon** (not SQLite).
+
+**Documented deviations from the new spec (approved):**
+- **DB = PostgreSQL (Neon)** instead of SQLite, so the demo stays deployable/live.
+- **Multi-role users (`roles[]`)** instead of one role per user, because one person can be Auditor + Auditee in the field. Access = union; demo login still works.
+
+**Alignment backlog (do gradually, scoring is the heart):**
+1. Scoring two-layer (§5.4): keep Nilai Utama (existing engine), add `Score Akhir = Nilai Utama − Temuan Berulang − Parking Lot`; validate April-2026 baseline (0→100.0, 1→99.0, 5→95.0). Needs `Score.nilaiUtama/temuanBerulang/parkingLot/scoreAkhir` + `Finding.isRecurring`.
+2. `Finding.kategori` LOW/HIGH (auditor records category, not status) (§5.1).
+3. Follow-up: `woScPoNumber` required when Komite sets Progress (§5.2/5.3); FU limit 25/area/month + 17.00 cut-off.
+4. Target 21 (20+1) framing in audit UI (§5.1) — no minimum-20 rule.
+5. Auditor scoring, 4 components @25% (§5.5).
+6. Role switcher demo (§4).
+7. Brand red → #E30613 (§3).
+8. Keep Daily Checklist & Red Tag OUT of Score Akhir (already true).
+
+**Open question (blocks scoring):** the numeric weight of **Parking Lot** in Score Akhir (the baseline only exercises Temuan Berulang). Awaiting owner input.

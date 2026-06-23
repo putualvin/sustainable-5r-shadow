@@ -1,345 +1,219 @@
-# Sustainable 5R Application — Shadow Build
+# CLAUDE.md — Sustainable 5R (Shadow Build)
 
-> This file is read automatically by Claude Code at the start of every session.
-> It contains business rules, design decisions, and conventions that MUST be respected.
-> When in doubt, re-read this file before making changes.
+> File ini adalah konteks proyek untuk Claude Code. Dibaca otomatis tiap sesi. Jangan dihapus.
+> Tujuan: membangun **demo personal** aplikasi Sustainable 5R untuk memvalidasi requirement BRD — bukan sistem produksi. Produksi dikerjakan tim IT internal secara terpisah.
 
-## Project context
+---
 
-This is a **shadow build** of a Sustainable 5R digitalisation application for Sinar Mas Agribusiness and Food (Downstream Indonesia, Operational Excellence). The official version is being built by the internal IT team — this shadow build serves as:
-1. A working prototype for stakeholder demos and validation
-2. A reference implementation to compare against IT's version
-3. A POC to prove the design works end-to-end
+## 0. Catatan implementasi shadow build (penyimpangan terdokumentasi)
 
-**Domain:** "5R" is the Indonesian adaptation of the Japanese 5S methodology — Ringkas (Sort), Rapi (Set in order), Resik (Shine), Rawat (Standardize), Rajin (Sustain). The app digitises a monthly housekeeping audit cycle at a refinery (12 areas in pilot unit Refinery 2).
+Spec di bawah adalah sumber kebenaran. Dua penyimpangan teknis yang disetujui pemilik (lihat `docs/decisions.md`):
+- **Database: PostgreSQL (Neon)**, bukan SQLite — agar demo bisa di-deploy live (Vercel). Prisma tetap dipakai; secara lokal butuh `DATABASE_URL`.
+- **Role: multi-role per user** (`User.roles[]`), bukan satu role — karena di lapangan satu orang bisa Auditor sekaligus Auditee. Akses = gabungan izin. Switcher/login demo tetap disediakan.
 
-## Tech stack — DO NOT change without discussion
+Selain dua hal di atas, ikuti spec apa adanya. Aturan terkunci §5 menang.
 
-- **Framework:** Next.js 14 (App Router) + TypeScript
-- **Styling:** Tailwind CSS + shadcn/ui components
-- **Database:** SQLite via Prisma ORM (file-based — `prisma/dev.db`)
-- **State:** React Server Components by default; Zustand only when actually needed for client state
-- **Forms:** React Hook Form + Zod
-- **Charts:** Recharts
-- **Icons:** lucide-react
-- **QR codes:** qrcode.react
-- **Dates:** date-fns
+---
 
-Rationale: SQLite is intentional. This is a shadow build, not production. No Docker, no external services. Must run with `npm run dev` and nothing else.
+## 1. Apa yang sedang kita bangun
 
-## Critical business rules — NEVER violate
+Aplikasi digitalisasi program **Sustainable 5R** (Ringkas, Rapi, Resik, Rawat, Rajin) untuk Sinar Mas Agribusiness and Food — Downstream Indonesia, unit pilot **Refinery 2 (12 area)**. Menggantikan proses manual (form kertas, kompilasi Excel, laporan PPT).
 
-These rules come from real stakeholder decisions in meetings with Bu Ir (Business Owner), Pak Muhib (Auditor Coordinator), and Pak Halim (Committee). They are not suggestions.
+Ekosistem penuh, **3 modul fungsional yang saling terpisah**:
+1. **Audit 5R** — inspeksi bulanan cross-area berbasis Guiding Questions → temuan → tindak lanjut → penilaian status oleh Komite → scoring.
+2. **Daily Checklist** — checklist harian yes/no area-specific. **TERPISAH penuh dari Audit.**
+3. **Red Tag** — manajemen barang dengan deadline 30/90 hari.
 
-### 1. SCORING FORMULA (this is the heart of the system — get it exactly right)
+Plus: dashboard real-time, laporan bulanan auto-generate, role-based access (6 role).
 
-Each finding has one of three closing statuses: **Done**, **Progress**, or **No Progress**.
+### Sifat proyek (penting untuk keputusan teknis)
+- **Demo-focused, bukan production-grade.** Utamakan: jalan, jelas, mudah didemokan. Bukan: skalabilitas, auth enterprise, optimasi.
+- Boleh pakai **seed data dummy** yang realistis (12 area Refinery 2, contoh temuan, contoh user tiap role).
+- Tidak perlu integrasi eksternal (SAP/ERP/QMS) — di luar scope.
 
-Weights: Done = +2, Progress = +1, No Progress = -1. Total weight = 2.
+---
 
-Formula:
-```
-donePct       = (countDone / countTotal) × 100
-progressPct   = (countProgress / countTotal) × 100
-noProgressPct = (countNoProgress / countTotal) × 100
+## 2. Tech Stack (sudah ditetapkan — jangan diganti tanpa diminta)
 
-valueDone       = (donePct / 100) × 2
-valueProgress   = (progressPct / 100) × 1
-valueNoProgress = (noProgressPct / 100) × -1
+| Layer | Pilihan |
+|---|---|
+| Framework | **Next.js 14** (App Router) |
+| Bahasa | **TypeScript** (strict) |
+| Database | **PostgreSQL (Neon)** via Prisma — lihat §0 |
+| ORM | **Prisma** |
+| Styling | **Tailwind CSS** |
+| UI components | Boleh shadcn/ui bila membantu; jaga ringan |
+| Charts | recharts |
+| State | React state / server components; hindari state manager berat |
 
-finalScore = ((valueDone + valueProgress + valueNoProgress) / 2) × 100
-// then round to nearest integer
-```
+**Aturan teknis:**
+- Mobile-first (auditor & auditee pakai HP di lapangan). Layout harus enak di layar sempit.
+- Semua teks UI dalam **Bahasa Indonesia**. Kode, nama variabel, komentar boleh Inggris.
+- Jangan pakai localStorage/sessionStorage untuk data inti — pakai DB. (Pengecualian: draft input offline boleh localStorage, tetap sinkron ke DB.)
+- Foto: untuk demo cukup upload ke folder lokal `/public/uploads` atau simpan path; tidak perlu cloud storage.
 
-**Worked example (USE THIS AS A TEST):**
-- 17 Done, 3 Progress, 1 No Progress, 21 total
-- Done 81% × 2 = 1.62
-- Progress 14% × 1 = 0.14
-- No Progress 5% × (−1) = −0.05
-- (1.62 + 0.14 − 0.05) / 2 = 0.855 → 85.5% → rounds to **86%**
+---
 
-**This formula must live in ONE pure function** at `lib/scoring.ts`, with the worked example as a unit test. Never inline this calculation elsewhere.
+## 3. Brand & Desain
 
-### 2. Findings: NO minimum count rule
+Palet Sinar Mas:
+- Primary merah `#E30613`, hitam `#1A1A1A`, grey `#B3B3B3`
+- Sekunder: kuning `#F5C518`, oranye `#E89A1F`, teal `#1A8A8A`, hijau `#8BC972`
 
-There is **NO** "minimum 20 findings" requirement. Auditors submit however many quality findings they have. Earlier versions of this requirement existed; the team explicitly removed it. Do not re-introduce it as validation.
+Status temuan punya **warna konsisten di seluruh app** (baca dulu sebelum bikin komponen):
+- Done → hijau · Progress → kuning/amber · No Progress → merah
+- Kategori: Low → netral/abu · High → merah
+- Red Tag deadline: aman → hijau · mendekati → amber · lewat → merah
 
-### 3. CAPA: NO dispute/sanggahan feature
+Prinsip: High Signal/Low Noise, whitespace longgar, layout organik (hindari tampilan korporat yang kaku/simetris-sempurna). Tiap layar punya **satu aksi utama** yang jelas.
 
-After receiving a finding, the auditee goes **directly** to filling CAPA. There is no "dispute" button, no "sanggahan" workflow. Disputes happen verbally during the on-site audit, not in the app. Do not add a dispute step even if it seems "nice to have".
+---
 
-### 4. CAPA: ONE after-photo only
+## 4. Role & Beranda (6 role)
 
-CAPA has a single "after" photo field, not multiple. Corrective action and preventive action are two separate text fields within the same CAPA form.
+Login → deteksi role → masuk ke beranda masing-masing (tanpa menu pemilihan). Untuk demo, sediakan switcher role sederhana.
 
-### 5. Photo upload: BOTH camera AND gallery
-
-In flammable/diesel areas, phones are banned and photos are taken with an external explosion-proof camera. Therefore, **every photo input must support both** live camera capture AND upload from gallery/file. Never make camera the only option.
-
-### 6. Audit and Daily Checklist are TWO DIFFERENT things — never mix them
-
-This is the most commonly confused rule. Read carefully.
-
-**Audit 5R** is a *monthly cross-area inspection* done by an Auditor on someone else's area. Findings are classified using **27 Guiding Questions** structured across the 5 R principles. Each finding picks one category (Ringkas/Rapi/Resik/Rawat/Rajin) then one sub-category. See section "Guiding Questions (Audit)" below for the full list.
-
-**Daily Checklist** is a *self-check done daily per shift* by the area's own PIC. Each area has its own set of **area-specific yes/no questions** (e.g. "Apakah drip pan dalam kondisi bersih?"). See section "Daily Checklist items" below.
-
-They share NO question sets. They have separate database tables, separate forms, separate scoring. When in doubt, ask: "Who fills this, how often?" — that tells you which is which.
-
-### 7. Offline-capable for audit input and daily checklist
-
-When network is unavailable, the user must be able to keep entering audit findings and daily checklist items. Data is saved locally and a banner shows "Mode offline — akan disinkronkan". For this shadow build, simulate this by writing to localStorage and showing the banner; real sync logic can be deferred.
-
-### 8. Navigation: forward AND back, without losing data
-
-This is a real bug found in an earlier prototype. Users must be able to navigate forward and back between pages without losing entered form data. Use proper Next.js navigation, persist form state appropriately.
-
-### 9. Language
-
-All UI text is in **Bahasa Indonesia**. Code identifiers, comments, file names, and database columns are in English. Error messages shown to users: Bahasa Indonesia. Logs and dev errors: English.
-
-## Roles (RBAC)
-
-Six roles. Enforce in middleware AND in UI (hide menus user can't access; return 403 page if URL accessed directly):
-
-| Role | Bahasa label | Access |
+| Role | Fokus | Beranda |
 |---|---|---|
-| `admin` | Admin | User & role management, master data, audit log |
-| `komite_unit` | Komite Unit | Verify CAPA, scoring, monthly reports, schedule, rankings |
-| `auditor` | Auditor | Input audits, view schedule, view own area scores |
-| `auditee` | Auditee / PIC Area | Receive findings, fill CAPA, daily checklist, register Red Tag |
-| `kord_red_tag` | Koordinator Red Tag | Approve/reject Red Tag disposal decisions |
-| `management` | Management | View-only dashboards |
+| **Admin** | Master data & konfigurasi | Status setup |
+| **Komite Unit** | Kelola siklus, nilai status, scoring, verifikasi | Ringkasan siklus + antrean penilaian |
+| **Auditor** | Menjalankan audit cross-area | Penugasan audit aktif |
+| **Auditee / PIC Area** | Tindak lanjut temuan + Daily Checklist | Temuan perlu tindakan + checklist hari ini |
+| **Koordinator Red Tag** | Kelola barang & deadline | Item mendekati/lewat batas |
+| **Management** | Pantau (read-only) | Dashboard skor & tren |
 
-For shadow build: mock login by email prefix. `admin@...` → admin, `komite@...` → komite_unit, `auditor@...` → auditor, `pic@...` → auditee, `redtag@...` → kord_red_tag, `gm@...` → management. Any password works.
+---
 
-## Areas (12 in pilot unit "Refinery 2")
+## 5. ATURAN BISNIS TERKUNCI (jangan diubah — ini hasil keputusan stakeholder)
 
-Refinery Lt 1, Refinery Lt 2, Refinery Lt 3, Fraksinasi Lt 1, Fraksinasi Lt 2, Fraksinasi Lt 3, Storage Area, Loading Bay, Control Room, Workshop, Office Area, Laboratory.
+Ini inti yang membedakan app ini. **Patuhi persis.**
 
-Note on parent groups: Refinery Lt 1/2/3 belong to the "Refinery" parent area, and Fraksinasi Lt 1/2/3 belong to the "Fractionation" parent area. Daily Checklist items below are organised by these parents — each floor inherits its parent's items.
+### 5.1 Audit
+- Audit **cross-area**: auditor menilai area yang **bukan miliknya**.
+- Siklus **bulanan**. Audit awal bulan (tgl 1–10 sesuai guidelines).
+- **Target temuan per area = 21** = **20 dari guiding question + 1 temuan berulang**.
+- Auditor **hanya mencatat temuan**: deskripsi, **kategori Low/High**, foto bukti. **Auditor TIDAK menetapkan status Done/Progress/No Progress.**
+- Output auditor termasuk **foto board**.
 
-## Guiding Questions (Audit 5R) — 27 items across 5 categories
+### 5.2 Tindak lanjut (oleh Auditee)
+- Auditee mengisi **root cause, corrective action, preventive action** + upload foto (boleh >1, dengan keterangan).
+- **Batas Follow-Up = 25 temuan per area per bulan**, cut-off pengisian **pukul 17.00**.
+- Temuan berstatus **Progress wajib mencantumkan nomor WO/SC/PO** (tidak bisa simpan tanpa itu).
 
-**Source:** Guidelines Sustainable 5R v.2 (Dec 2025). This is the official taxonomy for classifying audit findings — not for Daily Checklist.
+### 5.3 Penilaian status (oleh KOMITE, bukan auditor)
+- **Komite** menetapkan status tiap temuan saat penilaian bulanan, menilai **sejauh mana auditee menindaklanjuti**:
+  - **Done** = tuntas & disetujui → temuan **close**. Bobot **+2**.
+  - **Progress** = ditindaklanjuti tapi belum selesai (mis. WO dibuat, nunggu jadwal). Bobot **+1**. Wajib nomor WO/SC/PO.
+  - **No Progress** = belum ditindaklanjuti sampai batas penutupan CAPA. Bobot **−1**.
 
-**Behavior in the UI:** when the auditor logs a finding, they pick the category (level 1) → then pick the sub-category (level 2). The sub-category's description appears as helper text to guide judgement.
-
-**Seed data structure** (use this exact structure in `prisma/seed.ts`):
-
+### 5.4 Scoring (DUA LAPIS)
+**Lapis 1 — Score Hasil Audit (Nilai Utama):**
 ```
-RINGKAS — "Hanya barang yang diperlukan saja dan dalam jumlah tidak berlebihan"
-  1. Material dan atau Suku cadang
-     "Di area kerja tidak terdapat material yang tidak diperlukan untuk proses saat ini."
-  2. Mesin dan atau Peralatan Kerja
-     "Di area kerja ini tidak terdapat mesin / peralatan / tooling yang tidak sedang digunakan dan tanpa adanya tag merah."
-  3. Alat Bantu, Cetakan, dan Jig
-     "Di area kerja ini tidak terdapat jig, alat bantu, cetakan, atau item sejenisnya yang tidak digunakan."
-  4. Arsip
-     "Di area kerja ini tidak terdapat dokumen (semua informasi tertulis/tercetak baik yang berhubungan dengan kerja maupun tidak) yang sudah tidak terpakai / habis masa berlaku."
-  5. Jumlah barang dengan Tag Merah
-     "Barang-barang dengan tag merah yang belum dipindahkan ke Red Tag Area."
-
-RAPI — "Setiap barang jelas tempat dan statusnya"
-  1. Indikator Lokasi, Penyediaan Wadah
-     "Area penyimpanan, area kerja, dan lainnya telah diberi tanda lokasi dan alamat. Semua barang ada tempatnya."
-  2. Indikator Item
-     "Wadah; rak, pallet, basket, dll memiliki tanda yang menunjukkan item apa harus berada di mana."
-  3. Indikator Jumlah
-     "Dalam wadah tercantum indikasi untuk jumlah maksimum dan minimum yang diperbolehkan."
-  4. Garis Demarkasi
-     "Terdapat garis / warna maupun penanda lain yang digunakan untuk mematuhi SOP serta tidak ada barang yang diletakkan di luar batas garis."
-  5. Shadow Board / Rak / Wadah
-     "Penataan telah diatur untuk memfasilitasi kemudahan pengambilan, pengembalian, monitoring, FIFO."
-
-RESIK — "Area kerja bebas dari sumber kontaminasi"
-  1. Lantai
-     "Kebersihan lantai dijaga, berkilau, bebas dari ceceran sampah, material, oli, dan air."
-  2. Mesin dan atau Peralatan Kerja
-     "Mesin bebas dari serbuk / gram, sisa material, dan oli."
-  3. Membersihkan = Memeriksa
-     "Terdapat sistem pembersihan dan pelaporan abnormalitas; jadwal piket, sarana kebersihan, tempat sampah."
-  4. Area Kritis / Sumber Kotor
-     "Pada sumber pengotor sudah terlihat tindakan pembersihan."
-  5. Kebiasaan Membersihkan
-     "Pekerja tanpa diperintah terbiasa membersihkan lantai dan mengelap mesin."
-
-RAWAT — "Mempertahankan area kerja Ringkas-Rapi-Resik" (7 items)
-  1. SOP
-     "Di area kerja tercantum SOP 5R (alur proses) maupun Standar Kerja terkini."
-  2. Standard
-     "Terdapat standard area di setiap tempat kerja."
-  3. CheckList Standard
-     "Terdapat checklist standard area."
-  4. Improvement R1
-     "Terdapat tindak lanjut temuan audit sebelumnya, realisasi Improvement R1, maupun rencana improvement."
-  5. Improvement R2
-     "Terdapat tindak lanjut temuan audit sebelumnya, realisasi Improvement R2, maupun rencana improvement."
-  6. Improvement R3
-     "Terdapat tindak lanjut temuan audit sebelumnya, realisasi Improvement R3, maupun rencana improvement."
-  7. Audit 5R periode sebelumnya
-     "Tidak terdapat temuan audit dari periode sebelumnya yang belum di-close."
-
-RAJIN — "Setiap karyawan berdisiplin dan taat pada standard"
-  1. Ketaatan pada Standar
-     "Semua standar kerja (IK, Looking Standard, SOP 5R, dll) diikuti oleh karyawan."
-  2. Promosi 5R
-     "Terdapat pesan / slogan terkait budaya 5R."
-  3. Prosedur
-     "Prosedur-prosedur kerja (IK, Looking Standard, Memo Kerja, Resep, Process Card, Diagram Alir) dalam kondisi terkini dan ditinjau secara tetap."
-  4. Papan Aktivitas 5R
-     "Papan aktivitas 5R dalam kondisi terkini dan secara tetap ditinjau."
-  5. Pelatihan
-     "Setiap karyawan telah mendapatkan pelatihan prosedur kerja yang tepat."
+Nilai = persentase tiap kategori × bobot
+Bobot: Done = 2, Progress = 1, No Progress = −1   (total bobot = 2)
 ```
-
-**Total: 27 sub-categories (5+5+5+7+5).** Do not invent new categories. Do not collapse them. The taxonomy IS the standard.
-
-## Daily Checklist items — area-specific
-
-**Source:** existing AppSheet implementation (`Application_Documentation.pdf`). These are the actual items currently in use by PIC Areas. Use them verbatim in the seed.
-
-**Behavior:** items are scoped to **parent area groups** (Refinery / Fractionation). Each floor under that parent inherits the same item set. (E.g. Refinery Lt 1, Refinery Lt 2, Refinery Lt 3 all share the Refinery item set.)
-
-**Seed data — Refinery group (14 items):**
-
+**Lapis 2 — Score Akhir Sustainable 5R:**
 ```
-1.  Apakah drip pan pompa pompa Refinery dalam kondisi bersih
-2.  Apakah drip pan dan area D304 dan D300 dalam kondisi bersih
-3.  Apakah area control room Refinery bersih, tidak berminyak, dan berdebu
-4.  Apakah area HPB dan compressor tidak ada ceceran minyak
-5.  Apakah area sampling point bersih
-6.  Apakah Strainer in plant dalam kondisi bersih
-7.  Apakah Counter Bag filter sesuai actual stock
-8.  Apakah ada ceceran minyak dan tumpahan SBE di area SBE
-9.  Apakah ada tumpahan BE dan PA di area unloading
-10. Apakah ada pressure indicator yang abnormal
-11. Apakah ada barang yang tidak pada tempatnya (sarung tangan, majun, dll)
-12. Apakah ada barang yang tidak pada tempatnya (sepatu, sarung tangan, helm)
-13. Apakah area wastafel lantai 1 bersih, tidak becek, dan sabun terisi
-14. Apakah area wastafel lantai 2 tidak becek dan terisi sabun
+Score Akhir = Nilai Utama − Temuan Berulang − Parking Lot
 ```
+- **Temuan Berulang**: temuan **sama** pada **PIC area spesifik yang sama**, muncul **2 bulan berturut-turut** (bulan lalu & bulan ini). Dicek saat closing audit. **−1 poin per temuan berulang.**
+- **Parking Lot**: kumpulan temuan **Not Done** (Progress / No Progress). Otomatis terbentuk dari status. Menjadi pengurang Score Akhir.
+- Baseline validasi (Periode April 2026): area dengan 5 temuan berulang → skor **95.0**; 1 berulang → **99.0**; 0 → **100.0**.
 
-**Seed data — Fractionation group (10 items):**
+**PENTING:** **Daily Checklist dan Red Tag TIDAK masuk Score Akhir.** Keduanya dipantau sebagai compliance/lifecycle terpisah.
 
-```
-1.  Apakah drip pan pompa dan HE fractionation dalam kondisi bersih
-2.  Apakah drip pan pompa di filling room B dalam kondisi bersih
-3.  Apakah drip pan pompa di filling room C dalam kondisi bersih
-4.  Apakah ada ceceran minyak di lantai area coldroom dan filling room
-5.  Apakah ada ceceran minyak di lantai area ruang filter press
-6.  Apakah ada tumpahan / genangan di area pencucian filter leaf
-7.  Apakah area sparepart terkunci dan dalam keadaan rapi
-8.  Apakah jendela belakang filter press room di lantai 3 tertutup
-9.  Apakah kotak APD di lantai 1 untuk masuk area H-2 terisi cukup
-10. Apakah kotak APD di lantai 2 untuk masuk area H-2 terisi cukup
-```
+### 5.5 Scoring Auditor (4 komponen @25%)
+1. Ketepatan waktu audit (≤ tgl 10): on-time 100% / telat 0%
+2. Pencapaian target temuan (persentase vs target)
+3. Kualitas temuan (Low = score 1, High = score 2)
+4. Audit dilakukan bukan oleh auditor area (bukan auditor 100% / auditor area 0%)
 
-**Other areas (Storage Area, Loading Bay, Control Room, Workshop, Office Area, Laboratory):** items are not yet defined in AppSheet. For the shadow build, leave them empty in seed and add a note in `docs/decisions.md` that these areas need item definitions from the committee before they can be activated. Do not invent items for them.
+### 5.6 Daily Checklist
+- Item **yes/no area-specific** (mis. ±14 item grup Refinery, ±10 item grup Fractionation; sebagian area belum punya item → tampilkan **empty state jelas**, bukan error).
+- Harian, reset tiap hari. Reminder push (untuk demo: indikator/notifikasi in-app cukup).
+- Target compliance >90%.
 
-**Daily Checklist scoring:** simple percentage of items marked compliant. Threshold for notification: < 90%.
+### 5.7 Red Tag
+- Registrasi item: foto, lokasi, tanggal → sistem hitung deadline **30/90 hari**, generate **QR Code**.
+- Lifecycle: **Registered → (keputusan) → Disposed / Returned / Relocated**.
+- Auto-reminder menjelang batas.
 
-## Brand / design
+---
 
-- Primary color (Sinar Mas red): `#C8102E`
-- Dark variant: `#A00D24`
-- Secondary blue: `#1976D2`
-- Success: `#2E7D32`, Warning: `#ED6C02`, Danger: `#D32F2F`
-- Font: Inter (load from Google Fonts)
-- Mobile-first; bottom nav on mobile (<768px), sidebar on desktop
-- Touch targets minimum 44×44px
-- Tabular numerals for all scores and counts
-- Cards with subtle shadow, 8px border radius
+## 6. Yang TIDAK boleh ada (jaga scope — sudah dihapus/keputusan tim)
 
-These are defined as CSS variables in `app/globals.css` — use them, don't hard-code.
+- ❌ **Fitur sanggahan/dispute** temuan — sudah dihapus, jangan ditambahkan.
+- ❌ **Aturan minimum-20** sebagai pembatas — yang berlaku target 21 (20+1).
+- ❌ Auditor menetapkan status temuan — itu wewenang Komite.
+- ❌ Menggabungkan Audit dengan Daily Checklist dalam satu alur.
+- ❌ Memasukkan Daily Checklist / Red Tag ke perhitungan Score Akhir.
+- ❌ Integrasi SAP/ERP/QMS; migrasi data historis; modul e-learning.
 
-## File & folder conventions
+---
 
-```
-app/                  # Next.js App Router pages
-  (auth)/login/       # public routes grouped
-  (app)/              # authenticated routes
-    audit/
-    capa/
-    checklist/
-    redtag/
-    scores/
-    documents/
-    schedule/
-    admin/
-  api/                # route handlers
-components/
-  ui/                 # shadcn/ui primitives (don't edit unless extending)
-  shared/             # reusable app-specific components (KpiCard, ScoreCard, etc.)
-  forms/              # form components
-lib/
-  scoring.ts          # THE scoring engine. Pure function. Has tests.
-  db.ts               # Prisma client singleton
-  auth.ts             # mock auth helpers
-  rbac.ts             # role check helpers
-  utils.ts            # cn(), date formatters, etc.
-prisma/
-  schema.prisma
-  seed.ts             # realistic Indonesian dummy data
-types/                # shared TS types not generated by Prisma
-```
+## 7. State Machine (acuan status di DB & UI)
 
-## Coding conventions
+- **Audit:** `Belum mulai → Draft → Terkirim`
+- **Temuan (CAPA):** `Open → In Progress → Menunggu penilaian → (Komite nilai) → Close` *(jika Done)*; jika Progress/No Progress → lanjut bulan depan (masuk Parking Lot).
+- **Daily Checklist:** `Belum diisi → Terisi sebagian → Terkirim` (harian)
+- **Red Tag:** `Registered → keputusan → Disposed / Returned / Relocated`
 
-- **TypeScript strict mode is on.** No `any` without an inline comment justifying it.
-- **Server Components by default.** Add `"use client"` only when actually needed (event handlers, state, browser APIs).
-- **Prefer `async` Server Components + direct Prisma calls** over API routes, unless mutation needs to be called from client.
-- **Mutations use Server Actions** (`"use server"`), not API routes, unless there's a reason.
-- **Zod validation on every form.** Define schema in `lib/schemas/` and share between client and server.
-- **Never call Prisma from client components.** Pass data down as props.
-- **One responsibility per component.** If a component file exceeds ~150 lines, split it.
-- **Imports order:** React → Next → third-party → `@/lib` → `@/components` → relative.
+---
 
-## Things to AVOID
+## 8. Model Data (acuan Prisma — kembangkan sesuai kebutuhan)
 
-- Inline scoring math. The formula lives in ONE place.
-- Hard-coded role checks like `if (user.role === "admin")`. Use `lib/rbac.ts` helpers.
-- Inline color values like `bg-[#C8102E]`. Use Tailwind theme tokens.
-- `useState` for data that the URL could hold (filters, tabs). Use `searchParams`.
-- Mock data scattered across files. Seed data lives in `prisma/seed.ts`.
-- Long form components without React Hook Form. Even small forms benefit from it.
-- Creating files speculatively. Build what's needed for the current module.
+Entitas inti (minimal):
+- `User` (id, nama, role, areaId?) — role: ADMIN, KOMITE, AUDITOR, AUDITEE, REDTAG, MANAGEMENT *(catatan §0: di shadow build pakai `roles[]` multi-role)*
+- `Area` (id, nama, grup) — 12 area Refinery 2
+- `AuditCycle` (id, periode, status) — siklus bulanan
+- `AuditAssignment` (id, cycleId, areaId, auditorId)
+- `GuidingQuestion` (id, prinsipR, teks) — 5R
+- `Finding` (id, assignmentId, areaId, guidingQuestionId?, deskripsi, kategori[LOW|HIGH], isRecurring, fotoPaths[], status[OPEN|PROGRESS|NO_PROGRESS|DONE]?, statusSetByKomite)
+- `FollowUp` (id, findingId, rootCause, corrective, preventive, woScPoNumber?, fotoPaths[])
+- `Score` (id, cycleId, areaId, nilaiUtama, temuanBerulang, parkingLot, scoreAkhir)
+- `ChecklistItem` (id, areaId, teks) — yes/no, area-specific
+- `ChecklistEntry` (id, itemId, tanggal, jawaban[YES|NO], catatan?, fotoPath?)
+- `RedTagItem` (id, deskripsi, lokasi, foto, tglMasuk, deadline, qrCode, status)
 
-## Testing
+> Sesuaikan/normalisasi sesuai kebutuhan. Pastikan **scoring dihitung dari data, bukan di-hardcode**.
 
-For this shadow build, the bar is intentionally pragmatic:
-- **Must have unit tests:** `lib/scoring.ts` (the scoring formula — including the 21-finding example above).
-- **Must have unit tests:** `lib/rbac.ts` (role checks).
-- **Should have:** integration tests for happy-path audit → CAPA → score flow.
-- **Nice to have:** Playwright E2E for the demo flow.
+---
 
-Use Vitest. Run with `npm test`.
+## 9. Roadmap Build (urutan modul)
 
-## When you need to make a decision I haven't covered
+Demo-ready setelah **Modul 0–4**. Bangun bertahap, jangan loncat.
 
-1. Re-read this file first.
-2. Check `docs/decisions.md` if it exists.
-3. Pick the option that's: (a) simpler, (b) more aligned with existing patterns in the codebase, (c) easier to throw away if wrong.
-4. Add an entry to `docs/decisions.md` explaining what you chose and why.
+| # | Modul | Isi | Demo-ready? |
+|---|---|---|---|
+| **0** | Setup | Next.js 14 + Prisma + Tailwind, schema awal, seed data (12 area, user tiap role, guiding questions, contoh temuan) | — |
+| **1** | Auth & Role Shell | Login sederhana + role switcher demo, layout per role, navigasi | — |
+| **2** | Audit (Auditor) | Penugasan, daftar Guiding Questions per prinsip R, catat temuan (Low/High, foto), tandai baru/berulang, review & kirim | — |
+| **3** | Tindak Lanjut (Auditee) | Terima temuan, isi root cause/corrective/preventive, WO/SC/PO untuk Progress, upload foto, batas 25 & cut-off 17.00 | — |
+| **4** | Penilaian & Scoring (Komite) | Nilai status Done/Progress/No Progress, hitung Nilai Utama, Temuan Berulang, Parking Lot, **Score Akhir** | ✅ **demo inti** |
+| 5 | Daily Checklist | Item area-specific, isi harian, empty state, compliance | ✅ |
+| 6 | Red Tag | Registrasi, QR, deadline 30/90, lifecycle, reminder | ✅ |
+| 7 | Dashboard | Skor per area, tren, compliance, Red Tag, open follow-up (recharts) | ✅ |
+| 8 | Laporan Bulanan | Monthly 5R Review auto-generate, export | — |
+| 9 | Admin | Master data CRUD, konfigurasi item checklist per area | — |
 
-## Definition of "done" per feature
+---
 
-Before considering a feature complete, verify:
-- [ ] Works on mobile (resize browser to ~375px wide and test).
-- [ ] Works on desktop.
-- [ ] Loading state implemented.
-- [ ] Empty state implemented.
-- [ ] Form validation with inline errors (if applicable).
-- [ ] Role-based access enforced (if applicable).
-- [ ] Bahasa Indonesia UI text.
-- [ ] No console errors.
-- [ ] No TypeScript errors (`npm run typecheck`).
-- [ ] Seed data updated if new entities introduced.
+## 10. Cara kerja yang diharapkan
 
-## Process — how I want you to work with me
+- **Mulai dari Modul 0.** Jangan bangun semua sekaligus. Selesaikan satu modul, pastikan jalan, lanjut.
+- Setelah tiap modul: jalankan `npm run dev`, pastikan tidak ada error, beri ringkasan singkat apa yang sudah jadi & cara mendemokannya.
+- **Scoring adalah jantung app** — saat sampai Modul 4, tulis fungsi scoring murni (pure function) yang bisa diuji, dan **validasi terhadap baseline April 2026** (5 berulang → 95.0, dst).
+- Bila ada ambiguitas requirement, **tanya dulu** sebelum berasumsi. Rujuk aturan terkunci di §5.
+- Commit kecil & sering dengan pesan jelas.
+- Jaga UI Bahasa Indonesia, mobile-first, palet & warna status sesuai §3.
 
-- **Before writing code for a new feature:** outline the plan in 3-5 bullets, then wait for me to say "go".
-- **For changes that touch business rules** (scoring, validation, RBAC, the rules in this file): pause and confirm.
-- **After changes:** summarise what you did in 2-3 bullets, not a paragraph.
-- **When unsure:** ask one focused question rather than guessing.
-- **Don't restate this file back to me.** I wrote it / read it. Just follow it.
+---
+
+## 11. Referensi sumber kebenaran
+
+- **BRD Sustainable 5R** (BRD-5R-2026-001) — kebutuhan bisnis & requirement lengkap.
+- **Materi Training 5R 2026 v2** — tata cara scoring, Bobot Scoring, Parking Lot, Temuan Berulang.
+- **Guidelines Sustainable 5R v.2** — mekanisme audit & penilaian.
+- **Flow aktivitas "Audit Sustainable 5R"** (swimlane Komite/Auditor/Auditee) yang disepakati.
+
+Jika ragu antara dokumen dan file ini, **§5 (Aturan Terkunci) menang** kecuali diberitahu sebaliknya.
