@@ -27,9 +27,25 @@ export async function createRedTag(
     category: formData.get("category"),
     reason: formData.get("reason"),
     location: formData.get("location"),
+    findingId: formData.get("findingId") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+  }
+
+  // If raised from a CAPA/finding, link it and anchor the area to the finding's
+  // area (keeps the red tag consistent with its source).
+  let findingId: string | null = null;
+  let areaId = parsed.data.areaId;
+  if (parsed.data.findingId) {
+    const finding = await db.finding.findUnique({
+      where: { id: parsed.data.findingId },
+      include: { audit: { select: { areaId: true } } },
+    });
+    if (finding) {
+      findingId = finding.id;
+      areaId = finding.audit.areaId;
+    }
   }
 
   const year = new Date().getFullYear();
@@ -50,7 +66,8 @@ export async function createRedTag(
   await db.redTag.create({
     data: {
       tagNumber,
-      areaId: parsed.data.areaId,
+      areaId,
+      findingId,
       name: parsed.data.name,
       category: parsed.data.category,
       reason: parsed.data.reason,
@@ -63,6 +80,10 @@ export async function createRedTag(
 
   revalidatePath("/redtag");
   revalidatePath("/");
+  if (findingId) {
+    revalidatePath(`/capa/${findingId}`);
+    redirect(`/capa/${findingId}?redtag=1`);
+  }
   redirect("/redtag?created=1");
 }
 

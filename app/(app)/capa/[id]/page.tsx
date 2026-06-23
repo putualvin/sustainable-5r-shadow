@@ -1,13 +1,25 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, ImageOff, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
+import {
+  ChevronLeft,
+  ImageOff,
+  CheckCircle2,
+  Clock,
+  ShieldCheck,
+  Tag,
+  Plus,
+  ChevronRight,
+} from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canAccess, hasAnyRole } from "@/lib/rbac";
 import { PILLAR_LABEL } from "@/lib/pillars";
+import { STATUS_META } from "@/lib/redtag";
 import { formatPeriod, formatDateTime, formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { CapaForm } from "@/components/forms/capa-form";
 import { CapaStatusBadge } from "@/components/shared/capa-status-badge";
 import { CapaVerify } from "@/components/shared/capa-verify";
@@ -17,7 +29,7 @@ export default async function CapaDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { verified?: string };
+  searchParams: { verified?: string; redtag?: string };
 }) {
   const user = await getCurrentUser();
   if (!user || !canAccess(user.roles, "capa")) redirect("/403");
@@ -28,6 +40,7 @@ export default async function CapaDetailPage({
       capa: true,
       guidingQuestion: true,
       audit: { include: { area: true } },
+      redTags: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!finding) notFound();
@@ -43,6 +56,10 @@ export default async function CapaDetailPage({
   const isKomite = hasAnyRole(user.roles, "komite_unit", "admin");
   // Auditee may fill/edit only until Komite verifies; then it is locked.
   const canEdit = isAuditeeOwner && !verified;
+  // The PIC (or admin) may raise a red tag from this finding's CAPA.
+  const canRaiseRedTag =
+    canAccess(user.roles, "redtag") &&
+    (isAuditeeOwner || user.roles.includes("admin"));
 
   const defaults = {
     rootCause: c?.rootCause ?? "",
@@ -63,6 +80,11 @@ export default async function CapaDetailPage({
       {searchParams.verified && (
         <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2.5 text-sm text-success">
           <CheckCircle2 className="h-5 w-5" /> CAPA terverifikasi dan skor area diperbarui.
+        </div>
+      )}
+      {searchParams.redtag && (
+        <div className="flex items-center gap-2 rounded-md border border-secondary/30 bg-secondary/10 px-3 py-2.5 text-sm text-secondary">
+          <Tag className="h-5 w-5" /> Red Tag terdaftar dan ditautkan ke temuan ini.
         </div>
       )}
 
@@ -158,6 +180,61 @@ export default async function CapaDetailPage({
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
             Auditee belum mengisi CAPA untuk temuan ini.
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Red Tag terkait (temuan bisa berujung pada red tag) */}
+      {(finding.redTags.length > 0 || canRaiseRedTag) && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Tag className="h-4 w-4" /> Red Tag Terkait
+              </CardTitle>
+              {canRaiseRedTag && (
+                <Link href={`/redtag/baru?findingId=${finding.id}`}>
+                  <Button size="sm" variant="outline" className="gap-1">
+                    <Plus className="h-4 w-4" /> Daftarkan
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {finding.redTags.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Belum ada red tag dari temuan ini. Jika tindak lanjutnya berupa
+                penyingkiran barang, daftarkan red tag.
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {finding.redTags.map((rt) => (
+                  <li key={rt.id}>
+                    <Link
+                      href={`/redtag/${rt.id}`}
+                      className="flex items-center gap-3 py-2.5 hover:bg-muted/40"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-xs font-medium text-primary">
+                          {rt.tagNumber}
+                        </p>
+                        <p className="truncate text-sm">{rt.name}</p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium",
+                          STATUS_META[rt.status].cls
+                        )}
+                      >
+                        {STATUS_META[rt.status].label}
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       )}

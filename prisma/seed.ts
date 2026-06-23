@@ -358,18 +358,26 @@ async function main() {
     }
   }
 
-  // Sample Red Tags for REF-2 (varied urgency) — seed once.
+  // Sample Red Tags for REF-2 (varied urgency) — seed once. The first one is
+  // linked to the REF-2 "Material/Suku cadang" finding to show the CAPA→Red Tag
+  // flow (a Ringkas finding whose follow-up is to red-tag the item).
   if (ref2 && (await db.redTag.count()) === 0) {
     const day = 1000 * 60 * 60 * 24;
     const now = Date.now();
     const year = new Date().getFullYear();
+    const materialFinding = await db.finding.findFirst({
+      where: {
+        audit: { areaId: ref2.id },
+        guidingQuestion: { subCategory: "Material dan atau Suku cadang" },
+      },
+    });
     const seeds = [
       // approaching: registered 27 days ago, IN_AREA (30d) -> due in ~3 days
-      { name: "Motor pompa cadangan rusak", category: "Suku Cadang", reason: "Rusak, tidak dapat diperbaiki", location: "IN_AREA" as const, regAgo: 27, status: "OPEN" as const },
+      { name: "Motor pompa cadangan rusak", category: "Suku Cadang", reason: "Rusak, tidak dapat diperbaiki", location: "IN_AREA" as const, regAgo: 27, status: "OPEN" as const, findingId: materialFinding?.id ?? null },
       // overdue: registered 95 days ago, RT_AREA (90d) -> overdue ~5 days
-      { name: "Drum bekas pelarut", category: "Material", reason: "Tidak terpakai di proses saat ini", location: "RT_AREA" as const, regAgo: 95, status: "OPEN" as const },
+      { name: "Drum bekas pelarut", category: "Material", reason: "Tidak terpakai di proses saat ini", location: "RT_AREA" as const, regAgo: 95, status: "OPEN" as const, findingId: null },
       // decided
-      { name: "Panel kontrol lama", category: "Peralatan / Tooling", reason: "Sudah diganti unit baru", location: "RT_AREA" as const, regAgo: 40, status: "DISPOSED" as const },
+      { name: "Panel kontrol lama", category: "Peralatan / Tooling", reason: "Sudah diganti unit baru", location: "RT_AREA" as const, regAgo: 40, status: "DISPOSED" as const, findingId: null },
     ];
     let seq = 1;
     for (const s of seeds) {
@@ -379,6 +387,7 @@ async function main() {
         data: {
           tagNumber: `RT-${year}-${String(seq++).padStart(3, "0")}`,
           areaId: ref2.id,
+          findingId: s.findingId,
           name: s.name,
           category: s.category,
           reason: s.reason,

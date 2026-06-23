@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, ImageOff } from "lucide-react";
+import { ChevronLeft, ImageOff, LinkIcon } from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -28,7 +28,10 @@ export default async function RedTagDetailPage({
 
   const tag = await db.redTag.findUnique({
     where: { id: params.id },
-    include: { area: true },
+    include: {
+      area: true,
+      finding: { include: { guidingQuestion: true } },
+    },
   });
   if (!tag) notFound();
 
@@ -103,6 +106,20 @@ export default async function RedTagDetailPage({
               <p className="text-xs text-muted-foreground">Alasan</p>
               <p className="text-sm">{tag.reason}</p>
             </div>
+            {tag.finding && (
+              <Link
+                href={`/capa/${tag.finding.id}`}
+                className="flex items-center gap-2 rounded-md border border-secondary/30 bg-secondary/5 px-3 py-2 text-sm text-secondary hover:bg-secondary/10"
+              >
+                <LinkIcon className="h-4 w-4 shrink-0" />
+                <span>
+                  Berasal dari temuan audit:{" "}
+                  <span className="font-medium">
+                    {tag.finding.guidingQuestion.subCategory}
+                  </span>
+                </span>
+              </Link>
+            )}
           </CardContent>
         </Card>
 

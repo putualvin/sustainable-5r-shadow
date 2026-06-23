@@ -193,6 +193,7 @@ model Finding {
   updatedAt         DateTime        @updatedAt
 
   capa Capa?
+  redTags RedTag[]
 
   @@index([auditId])
   @@index([status])
@@ -302,6 +303,9 @@ model RedTag {
   tagNumber    String         @unique // RT-YYYY-NNN
   area         Area           @relation(fields: [areaId], references: [id])
   areaId       String
+  // Optional link to the audit finding/CAPA that triggered this red tag.
+  finding      Finding?       @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  findingId    String?
   name         String
   category     String
   reason       String
@@ -315,4 +319,5 @@ model RedTag {
   updatedAt    DateTime       @updatedAt
 
   @@index([status])
+  @@index([findingId])
 }

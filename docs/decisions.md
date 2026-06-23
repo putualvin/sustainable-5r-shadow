@@ -258,3 +258,16 @@ Format:
 6. **Inbox** is role-aware: auditee sees *Perlu Diisi / Menunggu Verifikasi / Terverifikasi*; Komite sees a *Menunggu Verifikasi* action queue + *Terverifikasi* + *Belum Diisi Auditee*.
 
 **Consequences:** Recompute is now triggered by Komite verification (not auditee save) — matching the real workflow. Seed gives REF-2 two filled-but-unverified CAPAs so the Komite queue is non-empty. This realises the "Komite verify CAPA" step previously deferred in the Module 3 note.
+
+---
+
+## 2026-06-16 — CAPA → Red Tag link
+
+**Context:** A finding's follow-up can be to red-tag an item (esp. Ringkas/Sort findings). The owner asked for a full data link between CAPA and Red Tag.
+
+**Decision:** `RedTag.findingId` (optional, `onDelete: SetNull`) links a red tag to the finding/CAPA it came from; `Finding.redTags` is the back-relation.
+- From the CAPA detail, the PIC/admin can "Daftarkan" a red tag → `/redtag/baru?findingId=…`, which pre-fills the area, shows the source finding, and stores the link. On save it returns to the CAPA (`?redtag=1`).
+- The CAPA detail lists linked red tags (number + status); the Red Tag detail links back to its source finding.
+- `createRedTag` anchors the area to the finding's area when raised from a finding (consistency). Auditees may only raise from a finding in their own area.
+
+**Consequences:** Scoring is untouched — the link is informational/navigational. Seed links one REF-2 red tag to the "Material/Suku cadang" finding to demo the flow.
