@@ -222,6 +222,7 @@ model Capa {
   rootCause        String
   correctiveAction String
   preventiveAction String
+  woScPoNumber     String? // wajib untuk status Progress (§5.2/§5.3)
   afterPhoto       String? // /uploads/... (single photo)
   dueDate          DateTime?
   status           CapaStatus? // null = menunggu verifikasi Komite Unit

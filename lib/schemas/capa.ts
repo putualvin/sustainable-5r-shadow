@@ -13,6 +13,7 @@ export const capaSchema = z.object({
     .string()
     .min(3, "Tindakan preventif minimal 3 karakter")
     .max(1000),
+  woScPoNumber: z.string().max(60).optional(),
   dueDate: z.string().optional(),
 });
 

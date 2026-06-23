@@ -338,11 +338,13 @@ async function main() {
         rootCause: "Seal pompa P-101 bocor sehingga oli menetes ke lantai.",
         correctiveAction: "Membersihkan ceceran dan mengganti seal pompa.",
         preventiveAction: "Menjadwalkan inspeksi seal pompa setiap minggu.",
+        woScPoNumber: "WO-2026-0456", // sudah ada WO → Komite bisa set Progress
       },
       {
         rootCause: "Garis demarkasi pudar dan drum tidak dikembalikan ke tempatnya.",
         correctiveAction: "Mengecat ulang garis dan menata ulang drum.",
         preventiveAction: "Audit penataan harian oleh PIC shift.",
+        woScPoNumber: null, // belum ada WO → Progress diblokir sampai dilengkapi
       },
     ];
     for (let i = 0; i < ref2Findings.length && i < capaSeeds.length; i++) {

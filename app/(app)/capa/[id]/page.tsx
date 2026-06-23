@@ -29,7 +29,7 @@ export default async function CapaDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { verified?: string; redtag?: string };
+  searchParams: { verified?: string; redtag?: string; error?: string };
 }) {
   const user = await getCurrentUser();
   if (!user || !canAccess(user.roles, "capa")) redirect("/403");
@@ -65,6 +65,7 @@ export default async function CapaDetailPage({
     rootCause: c?.rootCause ?? "",
     correctiveAction: c?.correctiveAction ?? "",
     preventiveAction: c?.preventiveAction ?? "",
+    woScPoNumber: c?.woScPoNumber ?? "",
     dueDate: c?.dueDate ? new Date(c.dueDate).toISOString().slice(0, 10) : "",
   };
 
@@ -77,6 +78,12 @@ export default async function CapaDetailPage({
         <ChevronLeft className="h-4 w-4" /> Kembali
       </Link>
 
+      {searchParams.error === "wo-required" && (
+        <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2.5 text-sm text-danger">
+          Status <strong>Progress</strong> butuh No. WO/SC/PO. Minta auditee
+          melengkapinya di CAPA sebelum diverifikasi sebagai Progress.
+        </div>
+      )}
       {searchParams.verified && (
         <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2.5 text-sm text-success">
           <CheckCircle2 className="h-5 w-5" /> CAPA terverifikasi dan skor area diperbarui.
@@ -157,6 +164,9 @@ export default async function CapaDetailPage({
             <Field label="Akar Masalah" value={c.rootCause} />
             <Field label="Tindakan Korektif" value={c.correctiveAction} />
             <Field label="Tindakan Preventif" value={c.preventiveAction} />
+            {c.woScPoNumber && (
+              <Field label="No. WO/SC/PO" value={c.woScPoNumber} />
+            )}
             {c.dueDate && (
               <Field label="Target Selesai" value={formatDate(c.dueDate)} />
             )}
@@ -252,6 +262,12 @@ export default async function CapaDetailPage({
             <p className="text-sm text-muted-foreground">
               Tetapkan status penyelesaian. Status ini yang dihitung ke skor 5R area.
             </p>
+            {!c.woScPoNumber?.trim() && (
+              <p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-warning">
+                Belum ada No. WO/SC/PO — status <strong>Progress</strong> tidak bisa
+                ditetapkan sampai auditee melengkapinya.
+              </p>
+            )}
             <CapaVerify findingId={finding.id} current={c.status} />
           </CardContent>
         </Card>

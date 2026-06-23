@@ -13,6 +13,7 @@ type Defaults = {
   rootCause: string;
   correctiveAction: string;
   preventiveAction: string;
+  woScPoNumber: string;
   dueDate: string; // yyyy-MM-dd or ""
 };
 
@@ -62,14 +63,28 @@ export function CapaForm({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="dueDate">Target Selesai (opsional)</Label>
-        <Input
-          id="dueDate"
-          name="dueDate"
-          type="date"
-          defaultValue={defaults.dueDate}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="woScPoNumber">No. WO / SC / PO</Label>
+          <Input
+            id="woScPoNumber"
+            name="woScPoNumber"
+            defaultValue={defaults.woScPoNumber}
+            placeholder="mis. WO-2026-0456"
+          />
+          <p className="text-xs text-muted-foreground">
+            Wajib bila Komite menetapkan status <strong>Progress</strong>.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="dueDate">Target Selesai (opsional)</Label>
+          <Input
+            id="dueDate"
+            name="dueDate"
+            type="date"
+            defaultValue={defaults.dueDate}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">

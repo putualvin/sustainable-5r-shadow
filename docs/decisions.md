@@ -293,3 +293,13 @@ Format:
 8. Keep Daily Checklist & Red Tag OUT of Score Akhir (already true).
 
 **Open question (blocks scoring):** the numeric weight of **Parking Lot** in Score Akhir (the baseline only exercises Temuan Berulang). Awaiting owner input.
+
+---
+
+## 2026-06-16 — Follow-up rules: WO/SC/PO for Progress + limit 25 + cut-off 17.00
+
+**Decisions (§5.2/§5.3):**
+- `Capa.woScPoNumber` added. Auditee enters it in the CAPA form (optional in general). **Komite cannot set status Progress unless the CAPA has a WO/SC/PO number** (`verifyCapa` blocks → `?error=wo-required`); the verify card warns when it's missing.
+- **Follow-up limit 25/area/month:** `fillCapa` blocks creating a NEW CAPA once the area already has 25 CAPAs for the period (editing existing is always allowed).
+- **Cut-off 17.00 WIB:** `fillCapa` rejects after 17:00 Asia/Jakarta (deploy runs UTC, so hour is derived in WIB). Note: a demo run after 17:00 WIB will see the auditee fill blocked — by design.
+- Seed: REF-2 CAPA #1 has WO-2026-0456 (Komite can set Progress); CAPA #2 has none (Progress blocked until filled).
