@@ -401,6 +401,23 @@ async function main() {
     }
   }
 
+  // Backfill (idempotent): link the "Motor pompa" red tag to the REF-2
+  // Material finding to demo the CAPA→Red Tag flow on already-seeded DBs.
+  if (ref2) {
+    const materialFinding = await db.finding.findFirst({
+      where: {
+        audit: { areaId: ref2.id },
+        guidingQuestion: { subCategory: "Material dan atau Suku cadang" },
+      },
+    });
+    if (materialFinding) {
+      await db.redTag.updateMany({
+        where: { areaId: ref2.id, findingId: null, name: "Motor pompa cadangan rusak" },
+        data: { findingId: materialFinding.id },
+      });
+    }
+  }
+
   // Reference documents (Module 7) — seed once.
   if ((await db.document.count()) === 0) {
     for (const d of DOCUMENTS) {
