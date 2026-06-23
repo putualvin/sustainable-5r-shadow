@@ -354,6 +354,27 @@ async function main() {
     }
   }
 
+  // Backfill (idempotent): make sure at least one REF-2 CAPA carries a WO number
+  // (so Komite can demo "Progress") even on already-seeded DBs. Sets it on a
+  // single CAPA only when none has one yet.
+  if (ref2) {
+    const anyWo = await db.capa.count({
+      where: { woScPoNumber: { not: null }, finding: { audit: { areaId: ref2.id } } },
+    });
+    if (anyWo === 0) {
+      const target = await db.capa.findFirst({
+        where: { woScPoNumber: null, finding: { audit: { areaId: ref2.id } } },
+        orderBy: { createdAt: "asc" },
+      });
+      if (target) {
+        await db.capa.update({
+          where: { id: target.id },
+          data: { woScPoNumber: "WO-2026-0456" },
+        });
+      }
+    }
+  }
+
   // Daily Checklist items (24) — seed once.
   if ((await db.checklistItem.count()) === 0) {
     let order = 0;
