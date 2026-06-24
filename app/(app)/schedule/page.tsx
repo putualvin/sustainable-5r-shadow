@@ -7,6 +7,7 @@ import { generateSchedule, shuffleSchedule } from "@/lib/actions/schedule";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PeriodTabs } from "@/components/shared/period-tabs";
+import { ScheduleAuditorSelect } from "@/components/forms/schedule-auditor-select";
 
 function currentPeriod(): string {
   const now = new Date();
@@ -69,6 +70,15 @@ export default async function SchedulePage({
     audits.filter((a) => a.scheduleId).map((a) => [a.scheduleId!, a.status])
   );
 
+  // Active auditors for manual assignment (komite/admin only).
+  const auditors = canManage
+    ? await db.user.findMany({
+        where: { roles: { has: "auditor" }, active: true },
+        select: { id: true, name: true, areaId: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -100,6 +110,13 @@ export default async function SchedulePage({
       </div>
 
       <PeriodTabs periods={periods} active={period} basePath="/schedule" />
+
+      {canManage && schedules.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          “Buat/Perbarui Jadwal” menugaskan auditor otomatis bergiliran. Ubah
+          auditor tiap area lewat dropdown (selama audit belum dimulai).
+        </p>
+      )}
 
       {searchParams.error === "no-auditors" && (
         <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -141,7 +158,18 @@ export default async function SchedulePage({
                     return (
                       <tr key={s.id} className="border-b last:border-0">
                         <td className="px-4 py-2 font-medium">{s.area.name}</td>
-                        <td className="px-4 py-2">{s.auditor.name}</td>
+                        <td className="px-4 py-2">
+                          {canManage && !statusBySchedule.has(s.id) ? (
+                            <ScheduleAuditorSelect
+                              scheduleId={s.id}
+                              areaId={s.areaId}
+                              currentAuditorId={s.auditorId}
+                              auditors={auditors}
+                            />
+                          ) : (
+                            s.auditor.name
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-muted-foreground">
                           {s.dueDate ? formatDate(s.dueDate) : "—"}
                         </td>

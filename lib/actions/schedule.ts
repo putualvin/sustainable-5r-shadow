@@ -76,6 +76,50 @@ export async function generateSchedule(formData: FormData): Promise<void> {
   redirect(`/schedule?period=${period}`);
 }
 
+// Manually set the auditor for a single schedule row (komite/admin). Enforces
+// no self-audit; blocked once the audit for that schedule has started.
+export async function setScheduleAuditor(formData: FormData): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || !canAccess(user.roles, "schedule") || !canManage(user.roles)) {
+    redirect("/403");
+  }
+
+  const scheduleId = String(formData.get("scheduleId") ?? "");
+  const auditorId = String(formData.get("auditorId") ?? "");
+
+  const schedule = await db.auditSchedule.findUnique({
+    where: { id: scheduleId },
+    include: { _count: { select: { audits: true } }, area: { select: { name: true } } },
+  });
+  if (!schedule) redirect("/schedule");
+  if (schedule._count.audits > 0) {
+    redirect(`/schedule?period=${schedule.period}`); // already started — locked
+  }
+
+  const auditor = await db.user.findUnique({ where: { id: auditorId } });
+  // Valid auditor, active, and not the PIC of the area being audited.
+  if (
+    !auditor ||
+    !auditor.active ||
+    !auditor.roles.includes("auditor") ||
+    auditor.areaId === schedule.areaId
+  ) {
+    redirect(`/schedule?period=${schedule.period}`);
+  }
+
+  await db.auditSchedule.update({ where: { id: scheduleId }, data: { auditorId } });
+
+  await logAction({
+    action: "schedule.assign",
+    entity: "AuditSchedule",
+    summary: `Menugaskan ${auditor.name} untuk audit ${schedule.area.name} (${formatPeriod(schedule.period)}).`,
+  });
+
+  revalidatePath("/schedule");
+  revalidatePath("/");
+  redirect(`/schedule?period=${schedule.period}`);
+}
+
 // Reassign auditors for the period. Schedules whose audit has already started
 // are left untouched; no auditor is assigned to their own area.
 export async function shuffleSchedule(formData: FormData): Promise<void> {
