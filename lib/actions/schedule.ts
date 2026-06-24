@@ -62,6 +62,7 @@ export async function generateSchedule(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/schedule");
+  revalidatePath("/");
   redirect(`/schedule?period=${period}`);
 }
 
@@ -119,5 +120,6 @@ export async function shuffleSchedule(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/schedule");
+  revalidatePath("/");
   redirect(`/schedule?period=${period}`);
 }

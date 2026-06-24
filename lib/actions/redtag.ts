@@ -100,12 +100,14 @@ export async function decideRedTag(formData: FormData): Promise<void> {
   });
   if (!parsed.success) redirect("/redtag");
 
-  await db.redTag.update({
+  const updated = await db.redTag.update({
     where: { id: parsed.data.id },
     data: { status: parsed.data.decision, decidedAt: new Date() },
   });
 
   revalidatePath("/redtag");
   revalidatePath(`/redtag/${parsed.data.id}`);
+  revalidatePath("/"); // home red-tag queue + KPI
+  if (updated.findingId) revalidatePath(`/capa/${updated.findingId}`);
   redirect(`/redtag/${parsed.data.id}`);
 }

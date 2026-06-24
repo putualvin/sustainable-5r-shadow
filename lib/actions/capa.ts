@@ -159,6 +159,8 @@ export async function fillCapa(
   });
 
   revalidatePath("/capa");
+  revalidatePath(`/capa/${parsed.data.findingId}`);
+  revalidatePath("/"); // home queues + CAPA KPI
   redirect("/capa?saved=1");
 }
 
@@ -209,6 +211,8 @@ export async function verifyCapa(formData: FormData): Promise<void> {
   revalidatePath("/capa");
   revalidatePath(`/capa/${parsed.data.findingId}`);
   revalidatePath("/scores");
+  revalidatePath(`/scores/${finding.audit.areaId}`);
+  revalidatePath("/reports");
   revalidatePath("/");
   redirect(`/capa/${parsed.data.findingId}?verified=1`);
 }

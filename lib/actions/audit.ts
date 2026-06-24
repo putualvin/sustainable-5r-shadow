@@ -84,6 +84,7 @@ export async function addFinding(
   });
 
   revalidatePath(`/audit/${parsed.data.auditId}`);
+  revalidatePath("/audit");
   return { ok: true };
 }
 
@@ -98,6 +99,7 @@ export async function deleteFinding(formData: FormData): Promise<void> {
     await db.finding.delete({ where: { id } });
   }
   revalidatePath(`/audit/${auditId}`);
+  revalidatePath("/audit");
 }
 
 // Submit final: lock the audit and distribute findings to the area PIC.
@@ -133,7 +135,10 @@ export async function submitAudit(formData: FormData): Promise<void> {
     summary: `Audit ${audit.area.name} dikirim dengan ${audit._count.findings} temuan.`,
   });
 
+  // Findings are distributed to the area PIC's CAPA inbox + appear in queues.
   revalidatePath(`/audit/${auditId}`);
   revalidatePath("/audit");
+  revalidatePath("/capa");
+  revalidatePath("/");
   redirect(`/audit/${auditId}?submitted=1`);
 }
