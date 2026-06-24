@@ -125,7 +125,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">{children}</main>
+        <main className="flex-1 p-4 pb-24 md:px-8 md:py-7 md:pb-7">{children}</main>
       </div>
 
       {/* Overflow sheet (mobile) */}

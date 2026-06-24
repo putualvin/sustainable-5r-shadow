@@ -30,7 +30,7 @@ export default async function ScoreDetailPage({
 
   if (!latest) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="max-w-4xl space-y-4">
         <BackLink />
         <h1 className="text-2xl font-bold">{area.name}</h1>
         <p className="text-sm text-muted-foreground">Belum ada data skor.</p>
@@ -56,7 +56,7 @@ export default async function ScoreDetailPage({
   }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <BackLink />
         <PrintButton />

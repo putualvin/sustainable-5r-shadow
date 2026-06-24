@@ -40,7 +40,7 @@ export default async function CapaInboxPage({
   const verified = findings.filter((f) => f.capa && f.capa.status); // sudah diverifikasi
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">CAPA</h1>
         <p className="text-sm text-muted-foreground">

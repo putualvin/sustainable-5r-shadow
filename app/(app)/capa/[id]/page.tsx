@@ -70,7 +70,7 @@ export default async function CapaDetailPage({
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <Link
         href="/capa"
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"

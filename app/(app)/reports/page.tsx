@@ -33,7 +33,7 @@ export default async function ReportsPage() {
 
   if (!period) {
     return (
-      <div className="mx-auto max-w-5xl">
+      <div className="max-w-6xl">
         <h1 className="text-2xl font-bold tracking-tight">Laporan Bulanan 5R</h1>
         <p className="mt-6 text-sm text-muted-foreground">Belum ada data untuk dilaporkan.</p>
       </div>
@@ -85,7 +85,7 @@ export default async function ReportsPage() {
   const belowThreshold = scores.filter((s) => s.finalScore < THRESHOLD);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="max-w-6xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Sustainable 5R — Dashboard Laporan</h1>

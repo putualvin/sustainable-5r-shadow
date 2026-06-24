@@ -46,7 +46,7 @@ export default async function RedTagNewPage({
   const defaultAreaId = finding?.audit.areaId ?? user.areaId;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <Link
         href={finding ? `/capa/${finding.id}` : "/redtag"}
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"

@@ -43,7 +43,7 @@ export default async function RedTagDetailPage({
     tag.status === "OPEN";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <Link
         href="/redtag"
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"

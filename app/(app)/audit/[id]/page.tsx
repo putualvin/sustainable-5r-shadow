@@ -60,7 +60,7 @@ export default async function AuditDetailPage({
   const reached = total >= TARGET;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <Link
         href="/audit"
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
