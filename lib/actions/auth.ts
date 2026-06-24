@@ -39,3 +39,20 @@ export async function logoutAction(): Promise<void> {
   destroySession();
   redirect("/login");
 }
+
+// Demo role switcher (§4): instantly become a known demo account without
+// logging out. Mock auth only — resolves roles from the DB (or email prefix).
+export async function switchRole(formData: FormData): Promise<void> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const prefixRoles = emailToRoles(email);
+  if (prefixRoles.length === 0) redirect("/login");
+
+  const dbUser = await db.user.findUnique({ where: { email } });
+  const roles =
+    dbUser && dbUser.active && dbUser.roles.length > 0
+      ? dbUser.roles
+      : prefixRoles;
+
+  createSession(email, roles);
+  redirect("/");
+}

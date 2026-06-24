@@ -26,6 +26,7 @@ import { rolesLabel } from "@/lib/rbac";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { RoleSwitcher } from "@/components/shared/role-switcher";
 
 const ICONS: Record<Section, LucideIcon> = {
   home: Home,
@@ -108,17 +109,20 @@ export function AppShell({
               <p className="text-sm font-semibold">{activeLabel}</p>
             </div>
           </div>
-          <form action={logoutAction}>
-            <Button
-              type="submit"
-              variant="ghost"
-              size="icon"
-              aria-label="Keluar"
-              className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground"
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </form>
+          <div className="flex items-center gap-1">
+            <RoleSwitcher currentEmail={user.email} variant="icon" align="down" />
+            <form action={logoutAction}>
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                aria-label="Keluar"
+                className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </form>
+          </div>
         </header>
 
         <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">{children}</main>
@@ -217,6 +221,9 @@ function UserBox({
             {rolesLabel(user.roles)}
           </p>
         </div>
+      </div>
+      <div className="mt-2">
+        <RoleSwitcher currentEmail={user.email} variant="full" align="up" />
       </div>
       <form action={logoutAction}>
         <Button
