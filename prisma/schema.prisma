@@ -183,7 +183,8 @@ model Audit {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  findings Finding[]
+  findings       Finding[]
+  findingReviews FindingReview[]
 
   @@index([auditorId])
   @@index([areaId, period])
@@ -207,8 +208,31 @@ model Finding {
   capa Capa?
   redTags RedTag[]
 
+  // Pre-audit verification links (§5.4):
+  reviewsAsPrev   FindingReview[] @relation("PrevReview")   // reviews of THIS finding next month
+  reviewAsCarried FindingReview?  @relation("CarriedReview") // the review that carried this finding in
+
   @@index([auditId])
   @@index([status])
+}
+
+// Pre-audit verification (§5.4): before recording new findings the auditor
+// reviews the AREA's previous-period findings and marks each as still present
+// (carried into this audit as a recurring finding) or already handled.
+model FindingReview {
+  id               String   @id @default(cuid())
+  audit            Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  auditId          String // the current (reviewing) audit
+  prevFinding      Finding  @relation("PrevReview", fields: [prevFindingId], references: [id], onDelete: Cascade)
+  prevFindingId    String // a finding from the same area, previous period
+  stillExists      Boolean // true = masih ada (berulang), false = sudah ditangani
+  // When still present, the recurring finding created in the current audit.
+  carriedFinding   Finding? @relation("CarriedReview", fields: [carriedFindingId], references: [id], onDelete: SetNull)
+  carriedFindingId String?  @unique
+  createdAt        DateTime @default(now())
+
+  @@unique([auditId, prevFindingId])
+  @@index([auditId])
 }
 
 // Corrective & Preventive Action — one per finding. No dispute step (rule 3),

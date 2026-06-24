@@ -87,6 +87,103 @@ export async function addFinding(
   return { ok: true };
 }
 
+// Verify a previous-period finding before the new audit (§5.4). Marking it
+// "still exists" carries it into the current audit as a recurring finding;
+// "handled" only records the verification. Re-marking replaces the verdict.
+export async function reviewPreviousFinding(formData: FormData): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || !canAccess(user.roles, "audit")) redirect("/403");
+
+  const auditId = String(formData.get("auditId") ?? "");
+  const prevFindingId = String(formData.get("prevFindingId") ?? "");
+  const verdict = String(formData.get("verdict") ?? ""); // "exists" | "handled"
+
+  const audit = await db.audit.findUnique({ where: { id: auditId } });
+  if (!audit) redirect("/audit");
+  if (user.roles.includes("auditor") && audit.auditorId !== user.id) redirect("/403");
+  if (audit.status !== "DRAFT") redirect(`/audit/${auditId}`);
+
+  const prev = await db.finding.findUnique({
+    where: { id: prevFindingId },
+    include: { audit: { select: { areaId: true, period: true } } },
+  });
+  // Guard: must be a finding from the SAME area and an earlier period.
+  if (
+    !prev ||
+    prev.audit.areaId !== audit.areaId ||
+    prev.audit.period >= audit.period
+  ) {
+    redirect(`/audit/${auditId}`);
+  }
+
+  const stillExists = verdict === "exists";
+
+  // Replace any prior verdict (and its carried recurring finding).
+  const existing = await db.findingReview.findUnique({
+    where: { auditId_prevFindingId: { auditId, prevFindingId } },
+  });
+  if (existing) {
+    if (existing.carriedFindingId) {
+      await db.finding.deleteMany({
+        where: { id: existing.carriedFindingId, status: "DRAFT" },
+      });
+    }
+    await db.findingReview.delete({ where: { id: existing.id } });
+  }
+
+  let carriedFindingId: string | null = null;
+  if (stillExists) {
+    const carried = await db.finding.create({
+      data: {
+        auditId,
+        guidingQuestionId: prev.guidingQuestionId,
+        locationDetail: prev.locationDetail,
+        description: prev.description,
+        kategori: prev.kategori,
+        isRecurring: true, // temuan berulang (§5.4)
+        photoPath: prev.photoPath,
+      },
+    });
+    carriedFindingId = carried.id;
+  }
+
+  await db.findingReview.create({
+    data: { auditId, prevFindingId, stillExists, carriedFindingId },
+  });
+
+  revalidatePath(`/audit/${auditId}`);
+  revalidatePath("/audit");
+}
+
+// Undo a previous-finding review (also removes any carried recurring finding).
+export async function undoFindingReview(formData: FormData): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || !canAccess(user.roles, "audit")) redirect("/403");
+
+  const auditId = String(formData.get("auditId") ?? "");
+  const reviewId = String(formData.get("reviewId") ?? "");
+
+  const review = await db.findingReview.findUnique({
+    where: { id: reviewId },
+    include: { audit: { select: { auditorId: true, status: true } } },
+  });
+  if (!review || review.auditId !== auditId) redirect(`/audit/${auditId}`);
+  if (user.roles.includes("auditor") && review.audit.auditorId !== user.id) {
+    redirect("/403");
+  }
+  if (review.audit.status !== "DRAFT") redirect(`/audit/${auditId}`);
+
+  if (review.carriedFindingId) {
+    await db.finding.deleteMany({
+      where: { id: review.carriedFindingId, status: "DRAFT" },
+    });
+  }
+  await db.findingReview.delete({ where: { id: review.id } });
+
+  revalidatePath(`/audit/${auditId}`);
+  revalidatePath("/audit");
+}
+
 export async function deleteFinding(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
   if (!user || !canAccess(user.roles, "audit")) redirect("/403");

@@ -1,14 +1,29 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, Trash2, Send, CheckCircle2, ImageOff, Target } from "lucide-react";
+import {
+  ChevronLeft,
+  Trash2,
+  Send,
+  CheckCircle2,
+  ImageOff,
+  Target,
+  History,
+  RotateCcw,
+  Repeat,
+} from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canAccess } from "@/lib/rbac";
 import { PILLAR_LABEL } from "@/lib/pillars";
-import { formatPeriod } from "@/lib/format";
+import { formatPeriod, prevPeriod } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { deleteFinding, submitAudit } from "@/lib/actions/audit";
+import {
+  deleteFinding,
+  submitAudit,
+  reviewPreviousFinding,
+  undoFindingReview,
+} from "@/lib/actions/audit";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AddFindingForm } from "@/components/forms/add-finding-form";
@@ -29,7 +44,7 @@ export default async function AuditDetailPage({
       area: true,
       auditor: { select: { name: true } },
       findings: {
-        include: { guidingQuestion: true },
+        include: { guidingQuestion: true, reviewAsCarried: true },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -47,6 +62,26 @@ export default async function AuditDetailPage({
     orderBy: { order: "asc" },
     select: { id: true, pillar: true, subCategory: true, description: true },
   });
+
+  // §5.4 — before recording new findings, the auditor verifies the area's
+  // previous-period findings (still present → recurring, or already handled).
+  const lastPeriod = prevPeriod(audit.period);
+  const prevFindings = canEdit
+    ? await db.finding.findMany({
+        where: {
+          audit: { areaId: audit.areaId, period: lastPeriod, status: "SUBMITTED" },
+        },
+        include: { guidingQuestion: true },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
+  const reviews =
+    canEdit && prevFindings.length > 0
+      ? await db.findingReview.findMany({ where: { auditId: audit.id } })
+      : [];
+  const reviewByPrev = new Map(reviews.map((r) => [r.prevFindingId, r]));
+  const reviewedCount = prevFindings.filter((f) => reviewByPrev.has(f.id)).length;
+  const reviewDone = prevFindings.length > 0 && reviewedCount === prevFindings.length;
 
   // Target temuan per area = 21 = 20 dari guiding question + 1 temuan berulang (§5.1).
   const TARGET = 21;
@@ -131,6 +166,135 @@ export default async function AuditDetailPage({
         </CardContent>
       </Card>
 
+      {/* Verifikasi temuan bulan lalu (§5.4) — sebelum mencatat temuan baru */}
+      {canEdit && prevFindings.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-4 w-4 text-primary" /> Verifikasi Temuan{" "}
+                {formatPeriod(lastPeriod)}
+              </CardTitle>
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-medium tabular-nums",
+                  reviewDone
+                    ? "bg-success/10 text-success"
+                    : "bg-warning/10 text-warning"
+                )}
+              >
+                {reviewedCount}/{prevFindings.length} diverifikasi
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Sebelum mencatat temuan baru, periksa temuan bulan lalu: tandai{" "}
+              <strong>Masih ada</strong> bila belum ditangani (otomatis menjadi{" "}
+              <strong>temuan berulang</strong> di audit ini) atau{" "}
+              <strong>Sudah ditangani</strong> bila sudah selesai.
+            </p>
+
+            <ul className="space-y-3">
+              {prevFindings.map((f) => {
+                const review = reviewByPrev.get(f.id);
+                return (
+                  <li
+                    key={f.id}
+                    className="rounded-lg border bg-card/50 p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {PILLAR_LABEL[f.guidingQuestion.pillar]}
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-medium",
+                          f.kategori === "HIGH"
+                            ? "bg-danger/10 text-danger"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {f.kategori === "HIGH" ? "High" : "Low"}
+                      </span>
+                      <span className="text-sm font-medium">
+                        {f.guidingQuestion.subCategory}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm">{f.description}</p>
+                    {f.locationDetail && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Lokasi: {f.locationDetail}
+                      </p>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {review ? (
+                        <>
+                          {review.stillExists ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning">
+                              <Repeat className="h-3.5 w-3.5" /> Masih ada · jadi
+                              temuan berulang
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Sudah
+                              ditangani
+                            </span>
+                          )}
+                          <form action={undoFindingReview}>
+                            <input type="hidden" name="auditId" value={audit.id} />
+                            <input type="hidden" name="reviewId" value={review.id} />
+                            <Button
+                              type="submit"
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1 text-muted-foreground"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" /> Ubah
+                            </Button>
+                          </form>
+                        </>
+                      ) : (
+                        <>
+                          <form action={reviewPreviousFinding}>
+                            <input type="hidden" name="auditId" value={audit.id} />
+                            <input type="hidden" name="prevFindingId" value={f.id} />
+                            <input type="hidden" name="verdict" value="exists" />
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 border-warning/40 text-warning hover:bg-warning/10"
+                            >
+                              <Repeat className="h-3.5 w-3.5" /> Masih ada
+                            </Button>
+                          </form>
+                          <form action={reviewPreviousFinding}>
+                            <input type="hidden" name="auditId" value={audit.id} />
+                            <input type="hidden" name="prevFindingId" value={f.id} />
+                            <input type="hidden" name="verdict" value="handled" />
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 border-success/40 text-success hover:bg-success/10"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Sudah
+                              ditangani
+                            </Button>
+                          </form>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Form tambah temuan (hanya draft, milik auditor) */}
       {canEdit && (
         <Card>
@@ -191,6 +355,11 @@ export default async function AuditDetailPage({
                           Berulang
                         </span>
                       )}
+                      {f.reviewAsCarried && (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          dari bulan lalu
+                        </span>
+                      )}
                       <span className="text-sm font-medium">
                         {f.guidingQuestion.subCategory}
                       </span>
@@ -201,9 +370,15 @@ export default async function AuditDetailPage({
                         Lokasi: {f.locationDetail}
                       </p>
                     )}
+                    {f.reviewAsCarried && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Dibawa dari verifikasi temuan bulan lalu — kelola lewat
+                        bagian Verifikasi di atas.
+                      </p>
+                    )}
                   </div>
 
-                  {canEdit && (
+                  {canEdit && !f.reviewAsCarried && (
                     <form action={deleteFinding}>
                       <input type="hidden" name="findingId" value={f.id} />
                       <input type="hidden" name="auditId" value={audit.id} />

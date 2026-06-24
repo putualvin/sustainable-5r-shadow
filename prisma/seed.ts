@@ -325,6 +325,56 @@ async function main() {
     }
   }
 
+  // Previous-period findings for one of auditor1's CURRENT-period areas, so the
+  // "Verifikasi Temuan Bulan Lalu" step (§5.4) has data to demo: when auditor1
+  // starts that area's audit this period, last month's findings appear for
+  // verification (Masih ada → temuan berulang / Sudah ditangani).
+  const lastPeriod = periodMonthsAgo(1);
+  const reviewSchedule =
+    auditor1 && ref2
+      ? await db.auditSchedule.findFirst({
+          where: { period, auditorId: auditor1.id, areaId: { not: ref2.id } },
+          orderBy: { area: { code: "asc" } },
+        })
+      : null;
+  if (
+    reviewSchedule &&
+    auditor2 &&
+    (await db.audit.count({
+      where: { areaId: reviewSchedule.areaId, period: lastPeriod },
+    })) === 0
+  ) {
+    const gqs = await db.guidingQuestion.findMany({ orderBy: { order: "asc" } });
+    const pick = (sub: string) => gqs.find((g) => g.subCategory === sub)!;
+    const prevAudit = await db.audit.create({
+      data: {
+        areaId: reviewSchedule.areaId,
+        auditorId: auditor2.id, // cross-area: a different auditor recorded last month
+        period: lastPeriod,
+        status: "SUBMITTED",
+        submittedAt: new Date(`${lastPeriod}-07T09:00:00`),
+      },
+    });
+    const prevSeeds = [
+      { gq: pick("Lantai"), location: "Area filling", description: "Tumpahan minyak belum dibersihkan tuntas di area filling.", kategori: "HIGH" as const },
+      { gq: pick("Garis Demarkasi"), location: "Jalur forklift", description: "Garis demarkasi jalur forklift pudar.", kategori: "LOW" as const },
+      { gq: pick("Material dan atau Suku cadang"), location: "Rak sparepart", description: "Sparepart tidak terpakai menumpuk di rak.", kategori: "LOW" as const },
+    ];
+    for (const f of prevSeeds) {
+      await db.finding.create({
+        data: {
+          auditId: prevAudit.id,
+          guidingQuestionId: f.gq.id,
+          locationDetail: f.location,
+          description: f.description,
+          kategori: f.kategori,
+          isRecurring: false,
+          status: "PENDING_CAPA",
+        },
+      });
+    }
+  }
+
   // The auditee has filled CAPA for 2 REF-2 findings — status left null so they
   // sit in the Komite's "Menunggu Verifikasi" queue (the auditee does NOT set
   // the closing status; Komite does during verification). Seeded once.
