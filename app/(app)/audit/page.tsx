@@ -97,7 +97,7 @@ export default async function AuditListPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{a.area.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatPeriod(a.period)} · {a._count.findings} temuan
+                        {formatPeriod(a.period)} · {a._count.findings}/21 temuan
                         {!isAuditor ? ` · ${a.auditor.name}` : ""}
                       </p>
                     </div>

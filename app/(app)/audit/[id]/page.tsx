@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, Trash2, Send, CheckCircle2, ImageOff } from "lucide-react";
+import { ChevronLeft, Trash2, Send, CheckCircle2, ImageOff, Target } from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canAccess } from "@/lib/rbac";
 import { PILLAR_LABEL } from "@/lib/pillars";
 import { formatPeriod } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { deleteFinding, submitAudit } from "@/lib/actions/audit";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,17 @@ export default async function AuditDetailPage({
     select: { id: true, pillar: true, subCategory: true, description: true },
   });
 
+  // Target temuan per area = 21 = 20 dari guiding question + 1 temuan berulang (§5.1).
+  const TARGET = 21;
+  const TARGET_REGULER = 20;
+  const total = audit.findings.length;
+  const berulang = audit.findings.filter((f) => f.isRecurring).length;
+  const reguler = total - berulang;
+  const countHigh = audit.findings.filter((f) => f.kategori === "HIGH").length;
+  const countLow = total - countHigh;
+  const pct = Math.min(100, Math.round((total / TARGET) * 100));
+  const reached = total >= TARGET;
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Link
@@ -79,6 +91,45 @@ export default async function AuditDetailPage({
           {isDraft ? "Draft" : "Terkirim"}
         </span>
       </div>
+
+      {/* Target temuan 21 (20 + 1) */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 font-semibold">
+              <Target className="h-4 w-4 text-primary" /> Target Temuan
+            </span>
+            <span className="tabular-nums text-sm">
+              <span className={cn("text-lg font-bold", reached ? "text-success" : "text-foreground")}>
+                {total}
+              </span>
+              <span className="text-muted-foreground"> / {TARGET}</span>
+            </span>
+          </div>
+          <div
+            className="h-2 w-full overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-valuenow={total}
+            aria-valuemax={TARGET}
+          >
+            <div
+              className={cn("h-full rounded-full transition-all", reached ? "bg-success" : "bg-warning")}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            20 dari guiding question + 1 temuan berulang
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Chip>
+              Reguler {reguler}/{TARGET_REGULER}
+            </Chip>
+            <Chip>Berulang {berulang}/1</Chip>
+            <Chip className="bg-muted text-muted-foreground">Low {countLow}</Chip>
+            <Chip className="bg-danger/10 text-danger">High {countHigh}</Chip>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Form tambah temuan (hanya draft, milik auditor) */}
       {canEdit && (
@@ -125,6 +176,21 @@ export default async function AuditDetailPage({
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                         {PILLAR_LABEL[f.guidingQuestion.pillar]}
                       </span>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-medium",
+                          f.kategori === "HIGH"
+                            ? "bg-danger/10 text-danger"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {f.kategori === "HIGH" ? "High" : "Low"}
+                      </span>
+                      {f.isRecurring && (
+                        <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                          Berulang
+                        </span>
+                      )}
                       <span className="text-sm font-medium">
                         {f.guidingQuestion.subCategory}
                       </span>
@@ -169,5 +235,24 @@ export default async function AuditDetailPage({
         </form>
       )}
     </div>
+  );
+}
+
+function Chip({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "rounded-full bg-primary/10 px-2.5 py-0.5 font-medium text-primary tabular-nums",
+        className
+      )}
+    >
+      {children}
+    </span>
   );
 }
