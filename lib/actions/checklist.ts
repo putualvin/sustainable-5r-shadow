@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccess } from "@/lib/rbac";
-import { savePhoto } from "@/lib/upload";
+import { photoDataUrl } from "@/lib/upload";
 
 function todayStr(): string {
   const d = new Date();
@@ -16,7 +16,7 @@ function todayStr(): string {
 
 export async function submitChecklist(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "checklist")) redirect("/403");
+  if (!user || !canAccess(user.roles, "checklist")) redirect("/403");
 
   if (!user.areaId) redirect("/checklist");
   const area = await db.area.findUnique({ where: { id: user.areaId } });
@@ -45,9 +45,7 @@ export async function submitChecklist(formData: FormData): Promise<void> {
     const compliant = formData.get(`compliant_${item.id}`) !== "no"; // default Sesuai
     if (compliant) compliantCount++;
     const note = String(formData.get(`note_${item.id}`) ?? "").trim() || null;
-    const photo = formData.get(`photo_${item.id}`);
-    const photoPath =
-      !compliant && photo instanceof File ? await savePhoto(photo) : null;
+    const photoPath = !compliant ? photoDataUrl(formData.get(`photo_${item.id}`)) : null;
     responses.push({ itemId: item.id, compliant, note, photoPath });
   }
 

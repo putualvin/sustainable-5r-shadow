@@ -160,3 +160,166 @@ Format:
 
 **Consequences:** Tag numbering is per-calendar-year and not gap-safe (deletions would leave gaps) — fine for a shadow build.
 
+
+---
+
+## 2026-06-16 — Module 6: Monthly Report (read-only over existing data)
+
+**Context:** Closing the roadmap's reporting module. Needed an executive monthly view without introducing new entities or touching the scoring/RBAC business rules.
+
+**Decisions:**
+1. **No schema change.** The report aggregates existing `Score`, `Finding`, and `Audit` rows. RBAC is unchanged — `reports` is already scoped to `komite_unit`/`management`/`admin` in `SECTION_ACCESS`.
+2. **Aggregation helpers are pure** in `lib/reports.ts` (`averageScore`, `totalCapaStatuses`, `findingsByPillar`, `recurringFindings`) with unit tests (`lib/reports.test.ts`). The page (`app/(app)/reports/page.tsx`) is a Server Component doing direct Prisma reads, then delegating math to those helpers — no scoring math inlined (rule 1).
+3. **Compliance donut + per-area table are driven by `Score`** (rich, all 12 areas), while the category bar and recurring panel are driven by `Finding` rows for the current period's submitted audits (sparse but real — only seeded REF-2 has findings). Honest empty states where data is thin.
+4. **Seeded 2 prior months of `Score`** (idempotent upsert, `periodMonthsAgo`) so the trend line and "vs last month" deltas render meaningfully. Older months trend slightly lower → gentle upward trend.
+5. **Print to PDF** reuses the existing `PrintButton` (`window.print()`); chart/cards print as laid out.
+6. **Home KPIs wired up** — the stale "Segera (Module 3/4/5)" placeholders now show real counts: open CAPA (findings PENDING_CAPA not yet Done), active Red Tags (status OPEN), and average Daily Checklist compliance this period.
+
+**Rationale:** Maximise demo value at minimal risk — no business-rule or schema changes, all logic in one tested place.
+
+**Consequences:** "Top categories" / "recurring findings" stay thin until more audits are submitted (real or seeded). PIC ranking is represented by the per-area score table (sorted desc) rather than a separate widget; auditor ranking is a dedicated activity list.
+
+---
+
+## 2026-06-16 — Deploy: Vercel + Neon, schema push & seed run during build
+
+**Context:** Stakeholder wanted a live URL. App is Next.js 14 + Prisma on PostgreSQL (Neon). The shadow-build sandbox's network policy blocks outbound Postgres (port 5432), so `prisma db push` / seed can't run from the build container — but Vercel's build/runtime reach Neon normally.
+
+**Decision:** `vercel.json` sets `buildCommand` to `prisma generate && prisma db push && tsx prisma/seed.ts && next build`. `DATABASE_URL` is supplied as a Vercel build+runtime env var. Deployed via `vercel deploy --prod` (CLI).
+
+**Rationale:** Runs the DB sync where the DB is reachable. The seed is idempotent (upserts + count guards), so re-running on each deploy is safe.
+
+**Consequences:**
+- Every production deploy re-syncs the schema and re-runs the seed. Seeded rows (areas/users/scores) are re-upserted, so a redeploy resets seeded scores (e.g. a recomputed REF-2 score returns to its seed tally). User-created rows (findings/CAPA/checklist runs/red tags beyond seeds) are NOT deleted. Fine for a demo; if a deploy must preserve live edits, drop `tsx prisma/seed.ts` from the build command first.
+- Mock auth means the URL is a **public demo** — anyone with the link can log in as any role. Not for sensitive data.
+
+---
+
+## 2026-06-16 — Module 7: Schedule, Documents, Admin
+
+**Context:** Final feature module. Three sub-areas, two new entities.
+
+**Decisions:**
+1. **Schedule** reuses the existing `AuditSchedule` model (no schema change). `generateSchedule` assigns active auditors round-robin across active areas (idempotent upsert per area+period); `shuffleSchedule` reassigns auditors via Fisher–Yates but **skips schedules whose audit already started** (so in-progress work isn't orphaned). Both are komite_unit/admin only; auditors view read-only. Period held in the URL (`?period=`), not state.
+2. **Documents** — new `Document` model (`title`, `category` enum, `version`, optional `fileUrl`, `description`, denormalized `uploadedBy`). Repository groups by category with version badges. `fileUrl` may be an uploaded file **or** an external URL; the form recommends URLs because the serverless filesystem is ephemeral (uploaded files won't persist on Vercel — same limitation noted for photos). komite_unit/admin manage; everyone reads. Seeded 6 reference docs (files attached via UI).
+3. **Admin** — users table with inline role change (`RoleSelect`, auto-submits) and active toggle. Guards prevent an admin self-demoting or self-deactivating (lockout safety). Admin only (`SECTION_ACCESS.admin`).
+4. **Audit log** — new append-only `AuditLog` model with **denormalized** user name/email (survives user edits). `lib/audit-log.ts#logAction` is best-effort (never throws into the calling action). Wired into the Module-7 mutations (schedule generate/shuffle, document add/delete, role/active changes) plus `submitAudit`. Coverage is the meaningful mutations, not literally every write — more call sites can be added later. Seeded 3 example entries so the log isn't empty.
+
+**Rationale:** Maximise coverage of the roadmap at shadow-build depth without touching the documented business rules (scoring/RBAC rules unchanged; role *data* is editable, the access *map* is not).
+
+**Consequences:** New tables (`Document`, `AuditLog`) are created by the deploy's `prisma db push`. The seeded REF-2 audit has no `scheduleId`, so it shows as "Belum mulai" on the schedule grid (status there is keyed by schedule-linked audits) — cosmetic only.
+
+---
+
+## 2026-06-16 — Module 8: Polish (offline, loading/error states)
+
+**Context:** Final polish pass. Headline item is business rule #7 (offline-capable audit input + daily checklist), previously unimplemented.
+
+**Decisions:**
+1. **Offline banner** — global `OfflineBanner` (client) mounted in the `(app)` layout. Listens to `online`/`offline` events + initial `navigator.onLine`; shows a sticky warning banner ("Mode offline — akan disinkronkan") with `role="status"`. Verified via Playwright `setOffline`.
+2. **Local draft persistence** — `lib/use-local-draft.ts` (`useLocalDraft`) persists form state to localStorage and restores on mount, so input survives reload, back/forward nav (rule #8), and going offline (rule #7). Applied to the audit **AddFindingForm** (made fields controlled, keyed by `auditId`) and the **ChecklistForm** (compliant map + notes, keyed by area+date+shift). Real server sync is deferred per the rule ("simulate via localStorage").
+   - Gotcha fixed: the persist effect must be gated on a `restored` **state flag** (not a ref), else the first persist pass writes the initial value back over the saved draft. Caught by a Playwright reload test (93% survived reload).
+3. **Loading states** — one `(app)/loading.tsx` renders a shared `PageSkeleton`, covering every authenticated route's data fetch via the App Router Suspense boundary.
+4. **Error states** — `(app)/error.tsx` client boundary with a Bahasa message + "Coba lagi" (reset). 403 page already existed.
+
+**Consequences:** Photos aren't included in localStorage drafts (binary, optional). Lighthouse was **not** run in this environment (no headful Chrome profile/CI lane) — left unchecked in the roadmap; basic a11y (aria-live banner, sr-only skeleton label, button labels) is in place.
+
+---
+
+## 2026-06-16 — Multi-role users (RBAC: roles[] instead of a single role)
+
+**Context:** In real 5R operations one person can be both an **auditor** (inspecting other areas) and an **auditee/PIC** (responsible for their own area). The original model gave each `User` a single `role`, so this wasn't expressible.
+
+**Decision:** Adopt standard set-based RBAC.
+1. `User.role: Role` → `User.roles: Role[]` (Postgres enum array; default `[auditee]`). Access is the **union** of all roles' permissions.
+2. `lib/rbac.ts`: `canAccess(roles, section)` (any role grants), `navForRoles`, `hasAnyRole`, `emailToRoles`, `rolesLabel`. "PIC of an area" stays modelled as `areaId` (an assignment), separate from roles.
+3. **Edge middleware** can't query the DB, so roles are written to a `session_roles` cookie at login (resolved from the DB user, or the email prefix for virtual users). `getCurrentUser` remains DB-authoritative; middleware is the coarse gate. Trade-off: an admin changing someone's roles is reflected in middleware only after that user re-logs in — but the page layer (DB) is authoritative, so it can't grant more than allowed.
+4. **Conflict of interest:** `generateSchedule`/`shuffleSchedule` never assign an auditor to audit their own area (`auditor.areaId === area.id` is skipped).
+5. **Admin UI:** single-role `<select>` → multi-select chips (`RolesSelect`) calling `setUserRoles`. Self-lockout guard now checks the *resulting set* still includes `admin`.
+6. **Demo:** PIC Fraksinasi Lt 1 (`pic.fra-1@5r.local`) holds `[auditee, auditor]` to showcase multi-role.
+
+**Consequences:**
+- Requires PostgreSQL (enum arrays aren't supported on SQLite), so the local SQLite preview path no longer applies to this feature — verification is via unit tests (RBAC, no DB) + build + the live Neon deploy.
+- The deploy's `prisma db push` now uses `--accept-data-loss` (dropping the old `role` column); the idempotent seed repopulates all users, so no meaningful data is lost in this shadow build.
+- Diverges from the single-role model implied in CLAUDE.md — an intentional enhancement; the 6 roles and the `SECTION_ACCESS` map are unchanged.
+
+---
+
+## 2026-06-16 — CAPA status is set by Komite Unit (verification), not the auditee
+
+**Context:** Business correction from the owner: the auditee/PIC fills the CAPA *plan*, but the **closing status** (Done / Progress / No Progress) — which drives the score — is the **Komite Unit's** decision during verification. The shadow build had previously let the auditee pick the status directly.
+
+**Decision:**
+1. `Capa.status` is now **nullable** (`CapaStatus?`); null = "Menunggu Verifikasi". Added `verifiedAt` + `verifiedBy` (denormalized).
+2. **Auditee** form (`fillCapa`) no longer has a status field — only root cause, corrective, preventive, due date, after-photo.
+3. **Komite/admin** verify via a new `verifyCapa` action (3 status buttons on the CAPA detail). Verifying sets the status + verifier + timestamp and **recomputes the area score**.
+4. **Score counts only VERIFIED CAPAs** (`recomputeAreaScore` filters `capa.status != null`). Unverified CAPAs are "not yet evaluated".
+5. **Lock after verification:** once Komite verifies, the auditee can no longer edit that CAPA (`fillCapa` rejects an edit when `status != null`); the detail page shows it read-only. (Per the owner: a verified CAPA isn't edited; scoring stands on it.)
+6. **Inbox** is role-aware: auditee sees *Perlu Diisi / Menunggu Verifikasi / Terverifikasi*; Komite sees a *Menunggu Verifikasi* action queue + *Terverifikasi* + *Belum Diisi Auditee*.
+
+**Consequences:** Recompute is now triggered by Komite verification (not auditee save) — matching the real workflow. Seed gives REF-2 two filled-but-unverified CAPAs so the Komite queue is non-empty. This realises the "Komite verify CAPA" step previously deferred in the Module 3 note.
+
+---
+
+## 2026-06-16 — CAPA → Red Tag link
+
+**Context:** A finding's follow-up can be to red-tag an item (esp. Ringkas/Sort findings). The owner asked for a full data link between CAPA and Red Tag.
+
+**Decision:** `RedTag.findingId` (optional, `onDelete: SetNull`) links a red tag to the finding/CAPA it came from; `Finding.redTags` is the back-relation.
+- From the CAPA detail, the PIC/admin can "Daftarkan" a red tag → `/redtag/baru?findingId=…`, which pre-fills the area, shows the source finding, and stores the link. On save it returns to the CAPA (`?redtag=1`).
+- The CAPA detail lists linked red tags (number + status); the Red Tag detail links back to its source finding.
+- `createRedTag` anchors the area to the finding's area when raised from a finding (consistency). Auditees may only raise from a finding in their own area.
+
+**Consequences:** Scoring is untouched — the link is informational/navigational. Seed links one REF-2 red tag to the "Material/Suku cadang" finding to demo the flow.
+
+---
+
+## 2026-06-16 — Re-baseline to BRD-aligned CLAUDE.md (align existing app)
+
+**Context:** Owner replaced CLAUDE.md with a more detailed, BRD-aligned spec ("lupakan semuanya") and chose to **align the existing app** (not restart) and **keep PostgreSQL/Neon** (not SQLite).
+
+**Documented deviations from the new spec (approved):**
+- **DB = PostgreSQL (Neon)** instead of SQLite, so the demo stays deployable/live.
+- **Multi-role users (`roles[]`)** instead of one role per user, because one person can be Auditor + Auditee in the field. Access = union; demo login still works.
+
+**Alignment backlog (do gradually, scoring is the heart):**
+1. Scoring two-layer (§5.4): keep Nilai Utama (existing engine), add `Score Akhir = Nilai Utama − Temuan Berulang − Parking Lot`; validate April-2026 baseline (0→100.0, 1→99.0, 5→95.0). Needs `Score.nilaiUtama/temuanBerulang/parkingLot/scoreAkhir` + `Finding.isRecurring`.
+2. `Finding.kategori` LOW/HIGH (auditor records category, not status) (§5.1).
+3. Follow-up: `woScPoNumber` required when Komite sets Progress (§5.2/5.3); FU limit 25/area/month + 17.00 cut-off.
+4. Target 21 (20+1) framing in audit UI (§5.1) — no minimum-20 rule.
+5. Auditor scoring, 4 components @25% (§5.5).
+6. Role switcher demo (§4).
+7. Brand red → #E30613 (§3).
+8. Keep Daily Checklist & Red Tag OUT of Score Akhir (already true).
+
+**Open question (blocks scoring):** the numeric weight of **Parking Lot** in Score Akhir (the baseline only exercises Temuan Berulang). Awaiting owner input.
+
+---
+
+## 2026-06-16 — Follow-up rules: WO/SC/PO for Progress + limit 25 + cut-off 17.00
+
+**Decisions (§5.2/§5.3):**
+- `Capa.woScPoNumber` added. Auditee enters it in the CAPA form (optional in general). **Komite cannot set status Progress unless the CAPA has a WO/SC/PO number** (`verifyCapa` blocks → `?error=wo-required`); the verify card warns when it's missing.
+- **Follow-up limit 25/area/month:** `fillCapa` blocks creating a NEW CAPA once the area already has 25 CAPAs for the period (editing existing is always allowed).
+- **Cut-off 17.00 WIB:** `fillCapa` rejects after 17:00 Asia/Jakarta (deploy runs UTC, so hour is derived in WIB). Note: a demo run after 17:00 WIB will see the auditee fill blocked — by design.
+- Seed: REF-2 CAPA #1 has WO-2026-0456 (Komite can set Progress); CAPA #2 has none (Progress blocked until filled).
+
+---
+
+## 2026-06-16 — Photo upload: data URLs instead of filesystem (serverless fix)
+
+**Context:** Uploading a photo always errored on the deploy. Root cause: the
+Vercel filesystem is read-only, so `writeFile` to `public/uploads/` throws
+`EROFS`, which failed the whole server action (add finding / fill CAPA /
+register red tag / checklist).
+
+**Decision:** No filesystem writes. `PhotoInput` resizes the chosen image
+client-side (canvas, max edge 1280px, JPEG q0.72) into a `data:image/...`
+URL and submits it as a hidden text field. The server (`photoDataUrl`)
+validates it and stores the string in the existing photo columns; pages render
+it directly via `<img src=…>`. Document uploads convert to a data URL too
+(`saveDocumentFile`, no FS), with a 4 MB cap (prefer an external URL for big
+files). Server Action body limit already raised to 12 MB.
+
+**Consequences:** Works on serverless and locally; images persist in the DB.
+Resized payloads are small (~100–500 KB). Caps guard against row bloat.

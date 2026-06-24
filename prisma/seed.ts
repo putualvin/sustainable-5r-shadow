@@ -1,10 +1,11 @@
 import {
   PrismaClient,
   type AreaGroup,
+  type DocCategory,
   type Pillar,
   type Role,
 } from "@prisma/client";
-import { calculate5RScore } from "../lib/scoring";
+import { calculateFinalScore } from "../lib/scoring";
 import { RETENTION_DAYS } from "../lib/redtag";
 
 const db = new PrismaClient();
@@ -56,19 +57,20 @@ const SCORE_TALLIES: {
   done: number;
   progress: number;
   noProgress: number;
+  recurring: number; // temuan berulang (§5.4) — pengurang Score Akhir
 }[] = [
-  { code: "REF-1", done: 17, progress: 3, noProgress: 1 },
-  { code: "REF-2", done: 20, progress: 2, noProgress: 0 },
-  { code: "REF-3", done: 12, progress: 5, noProgress: 4 },
-  { code: "FRA-1", done: 15, progress: 4, noProgress: 2 },
-  { code: "FRA-2", done: 18, progress: 2, noProgress: 1 },
-  { code: "FRA-3", done: 10, progress: 6, noProgress: 3 },
-  { code: "STG", done: 19, progress: 2, noProgress: 1 },
-  { code: "LDB", done: 14, progress: 5, noProgress: 3 },
-  { code: "CTR", done: 16, progress: 3, noProgress: 2 },
-  { code: "WSH", done: 13, progress: 4, noProgress: 3 },
-  { code: "OFF", done: 19, progress: 3, noProgress: 0 },
-  { code: "LAB", done: 17, progress: 4, noProgress: 1 },
+  { code: "REF-1", done: 17, progress: 3, noProgress: 1, recurring: 1 },
+  { code: "REF-2", done: 20, progress: 2, noProgress: 0, recurring: 1 },
+  { code: "REF-3", done: 12, progress: 5, noProgress: 4, recurring: 3 },
+  { code: "FRA-1", done: 15, progress: 4, noProgress: 2, recurring: 2 },
+  { code: "FRA-2", done: 18, progress: 2, noProgress: 1, recurring: 1 },
+  { code: "FRA-3", done: 10, progress: 6, noProgress: 3, recurring: 2 },
+  { code: "STG", done: 19, progress: 2, noProgress: 1, recurring: 0 },
+  { code: "LDB", done: 14, progress: 5, noProgress: 3, recurring: 2 },
+  { code: "CTR", done: 16, progress: 3, noProgress: 2, recurring: 1 },
+  { code: "WSH", done: 13, progress: 4, noProgress: 3, recurring: 2 },
+  { code: "OFF", done: 19, progress: 3, noProgress: 0, recurring: 0 },
+  { code: "LAB", done: 17, progress: 4, noProgress: 1, recurring: 1 },
 ];
 
 // Daily Checklist items per parent group (from AppSheet documentation, verbatim).
@@ -101,9 +103,32 @@ const CHECKLIST_ITEMS: { group: AreaGroup; text: string }[] = [
   { group: "FRACTIONATION", text: "Apakah kotak APD di lantai 2 untuk masuk area H-2 terisi cukup" },
 ];
 
+// Reference documents for the repository (Module 7). fileUrl left null —
+// registered references whose files/links are attached via the UI.
+const DOCUMENTS: {
+  title: string;
+  category: DocCategory;
+  version: string;
+  description: string;
+}[] = [
+  { title: "Guidelines Sustainable 5R v.2", category: "PANDUAN", version: "v2.0", description: "Panduan resmi 5R beserta 27 guiding questions (Des 2025)." },
+  { title: "SOP Pelaksanaan Audit 5R", category: "SOP", version: "v1.2", description: "Tata cara audit bulanan lintas area oleh auditor." },
+  { title: "SOP Pengelolaan Red Tag", category: "SOP", version: "v1.0", description: "Alur registrasi hingga keputusan disposal barang red tag." },
+  { title: "Standar Area Refinery", category: "STANDARD", version: "v1.1", description: "Standar kondisi 5R untuk area Refinery Lt 1–3." },
+  { title: "Template Temuan & CAPA", category: "TEMPLATE", version: "v1.0", description: "Format isian temuan audit dan rencana CAPA." },
+  { title: "Formulir Checklist Harian", category: "FORMULIR", version: "v1.0", description: "Cetakan checklist harian per shift untuk PIC area." },
+];
+
 function currentPeriod(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// "YYYY-MM" for the month `n` months before now (for seeded score history).
+function periodMonthsAgo(n: number): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 // 12 areas of pilot unit "Refinery 2".
@@ -140,21 +165,21 @@ async function main() {
   const users: {
     email: string;
     name: string;
-    role: Role;
+    roles: Role[];
     areaCode?: string;
   }[] = [
-    { email: "admin@5r.local", name: "Admin Sistem", role: "admin" },
-    { email: "komite@5r.local", name: "Halim (Komite Unit)", role: "komite_unit" },
-    { email: "auditor1@5r.local", name: "Muhib (Auditor)", role: "auditor" },
-    { email: "auditor2@5r.local", name: "Auditor Kedua", role: "auditor" },
+    { email: "admin@5r.local", name: "Admin Sistem", roles: ["admin"] },
+    { email: "komite@5r.local", name: "Halim (Komite Unit)", roles: ["komite_unit"] },
+    { email: "auditor1@5r.local", name: "Muhib (Auditor)", roles: ["auditor"] },
+    { email: "auditor2@5r.local", name: "Auditor Kedua", roles: ["auditor"] },
     {
       email: "pic.refinery2@5r.local",
       name: "PIC Refinery Lt 2",
-      role: "auditee",
+      roles: ["auditee"],
       areaCode: "REF-2",
     },
-    { email: "redtag@5r.local", name: "Koordinator Red Tag", role: "kord_red_tag" },
-    { email: "gm@5r.local", name: "Management", role: "management" },
+    { email: "redtag@5r.local", name: "Koordinator Red Tag", roles: ["kord_red_tag"] },
+    { email: "gm@5r.local", name: "Management", roles: ["management"] },
   ];
 
   for (const u of users) {
@@ -162,38 +187,81 @@ async function main() {
       u.areaCode === "REF-2" ? refinery2?.id ?? null : null;
     await db.user.upsert({
       where: { email: u.email },
-      update: { name: u.name, role: u.role, areaId },
-      create: { email: u.email, name: u.name, role: u.role, areaId },
+      update: { name: u.name, roles: u.roles, areaId },
+      create: { email: u.email, name: u.name, roles: u.roles, areaId },
     });
   }
 
-  // Scores for the current period
+  // A PIC (auditee) account per area so every audited area has a receiver for
+  // its findings (audit -> CAPA loop works for all 12 areas, not just REF-2).
+  // Email convention: pic.<area-code>@5r.local (prefix "pic" -> auditee role).
+  // FRA-1's PIC also holds the auditor role to demonstrate multi-role (one
+  // person who is both auditee for their area and an auditor elsewhere — the
+  // schedule generator never assigns them to audit their own area).
+  const allAreasForPic = await db.area.findMany({ orderBy: { code: "asc" } });
+  for (const area of allAreasForPic) {
+    const email = `pic.${area.code.toLowerCase()}@5r.local`;
+    const roles: Role[] = area.code === "FRA-1" ? ["auditee", "auditor"] : ["auditee"];
+    await db.user.upsert({
+      where: { email },
+      update: { name: `PIC ${area.name}`, roles, areaId: area.id },
+      create: { email, name: `PIC ${area.name}`, roles, areaId: area.id },
+    });
+  }
+
+  // Scores for the current period (two-layer §5.4 via lib/scoring.ts).
   const period = currentPeriod();
   for (const t of SCORE_TALLIES) {
     const area = await db.area.findUnique({ where: { code: t.code } });
     if (!area) continue;
-    const { finalScore } = calculate5RScore({
+    const s = calculateFinalScore({
       done: t.done,
       progress: t.progress,
       noProgress: t.noProgress,
+      recurring: t.recurring,
     });
+    const data = {
+      countDone: t.done,
+      countProgress: t.progress,
+      countNoProgress: t.noProgress,
+      nilaiUtama: s.nilaiUtama,
+      temuanBerulang: s.temuanBerulang,
+      parkingLot: s.parkingLot,
+      finalScore: s.scoreAkhir,
+    };
     await db.score.upsert({
       where: { areaId_period: { areaId: area.id, period } },
-      update: {
-        countDone: t.done,
-        countProgress: t.progress,
-        countNoProgress: t.noProgress,
-        finalScore,
-      },
-      create: {
-        areaId: area.id,
-        period,
-        countDone: t.done,
-        countProgress: t.progress,
-        countNoProgress: t.noProgress,
-        finalScore,
-      },
+      update: data,
+      create: { areaId: area.id, period, ...data },
     });
+  }
+
+  // Score history for the 2 previous periods so the monthly report trend and
+  // "vs last month" deltas are meaningful. Older months trend slightly lower.
+  for (const offset of [2, 1]) {
+    const histPeriod = periodMonthsAgo(offset);
+    for (const t of SCORE_TALLIES) {
+      const area = await db.area.findUnique({ where: { code: t.code } });
+      if (!area) continue;
+      const done = Math.max(0, t.done - offset * 2);
+      const progress = t.progress + offset;
+      const noProgress = t.noProgress + offset;
+      const s = calculateFinalScore({ done, progress, noProgress, recurring: t.recurring });
+      const data = {
+        countDone: done,
+        countProgress: progress,
+        countNoProgress: noProgress,
+        nilaiUtama: s.nilaiUtama,
+        temuanBerulang: s.temuanBerulang,
+        parkingLot: s.parkingLot,
+        finalScore: s.scoreAkhir,
+      };
+      await db.score.upsert({
+        where: { areaId_period: { areaId: area.id, period: histPeriod } },
+        update: data,
+        create: { areaId: area.id, period: histPeriod, ...data },
+      });
+    }
   }
 
   // Guiding Questions (27) — seed once.
@@ -231,15 +299,16 @@ async function main() {
         auditorId: auditor1.id,
         period,
         status: "SUBMITTED",
-        submittedAt: new Date(),
+        // Dikirim tgl 8 (≤ tgl 10) → on-time untuk demo Skor Auditor (§5.5).
+        submittedAt: new Date(`${period}-08T09:00:00`),
       },
     });
     const findingSeeds = [
-      { gq: pick("Lantai"), location: "Dekat pompa P-101", description: "Ceceran oli di lantai area pompa." },
-      { gq: pick("Garis Demarkasi"), location: "Area drum", description: "Drum diletakkan di luar garis demarkasi." },
-      { gq: pick("Material dan atau Suku cadang"), location: "Rak B2", description: "Material tidak terpakai menumpuk di rak." },
-      { gq: pick("SOP"), location: "Panel kontrol", description: "SOP 5R tidak terpasang/usang." },
-      { gq: pick("Promosi 5R"), location: "Dinding lorong", description: "Tidak ada slogan/visual budaya 5R." },
+      { gq: pick("Lantai"), location: "Dekat pompa P-101", description: "Ceceran oli di lantai area pompa.", kategori: "HIGH" as const, isRecurring: true },
+      { gq: pick("Garis Demarkasi"), location: "Area drum", description: "Drum diletakkan di luar garis demarkasi.", kategori: "LOW" as const, isRecurring: false },
+      { gq: pick("Material dan atau Suku cadang"), location: "Rak B2", description: "Material tidak terpakai menumpuk di rak.", kategori: "LOW" as const, isRecurring: false },
+      { gq: pick("SOP"), location: "Panel kontrol", description: "SOP 5R tidak terpasang/usang.", kategori: "HIGH" as const, isRecurring: false },
+      { gq: pick("Promosi 5R"), location: "Dinding lorong", description: "Tidak ada slogan/visual budaya 5R.", kategori: "LOW" as const, isRecurring: false },
     ];
     for (const f of findingSeeds) {
       await db.finding.create({
@@ -248,10 +317,118 @@ async function main() {
           guidingQuestionId: f.gq.id,
           locationDetail: f.location,
           description: f.description,
+          kategori: f.kategori,
+          isRecurring: f.isRecurring,
           status: "PENDING_CAPA",
         },
       });
     }
+  }
+
+  // Previous-period findings for one of auditor1's CURRENT-period areas, so the
+  // "Verifikasi Temuan Bulan Lalu" step (§5.4) has data to demo: when auditor1
+  // starts that area's audit this period, last month's findings appear for
+  // verification (Masih ada → temuan berulang / Sudah ditangani).
+  const lastPeriod = periodMonthsAgo(1);
+  const reviewSchedule =
+    auditor1 && ref2
+      ? await db.auditSchedule.findFirst({
+          where: { period, auditorId: auditor1.id, areaId: { not: ref2.id } },
+          orderBy: { area: { code: "asc" } },
+        })
+      : null;
+  if (
+    reviewSchedule &&
+    auditor2 &&
+    (await db.audit.count({
+      where: { areaId: reviewSchedule.areaId, period: lastPeriod },
+    })) === 0
+  ) {
+    const gqs = await db.guidingQuestion.findMany({ orderBy: { order: "asc" } });
+    const pick = (sub: string) => gqs.find((g) => g.subCategory === sub)!;
+    const prevAudit = await db.audit.create({
+      data: {
+        areaId: reviewSchedule.areaId,
+        auditorId: auditor2.id, // cross-area: a different auditor recorded last month
+        period: lastPeriod,
+        status: "SUBMITTED",
+        submittedAt: new Date(`${lastPeriod}-07T09:00:00`),
+      },
+    });
+    const prevSeeds = [
+      { gq: pick("Lantai"), location: "Area filling", description: "Tumpahan minyak belum dibersihkan tuntas di area filling.", kategori: "HIGH" as const },
+      { gq: pick("Garis Demarkasi"), location: "Jalur forklift", description: "Garis demarkasi jalur forklift pudar.", kategori: "LOW" as const },
+      { gq: pick("Material dan atau Suku cadang"), location: "Rak sparepart", description: "Sparepart tidak terpakai menumpuk di rak.", kategori: "LOW" as const },
+    ];
+    for (const f of prevSeeds) {
+      await db.finding.create({
+        data: {
+          auditId: prevAudit.id,
+          guidingQuestionId: f.gq.id,
+          locationDetail: f.location,
+          description: f.description,
+          kategori: f.kategori,
+          isRecurring: false,
+          status: "PENDING_CAPA",
+        },
+      });
+    }
+  }
+
+  // The auditee has filled CAPA for 2 REF-2 findings — status left null so they
+  // sit in the Komite's "Menunggu Verifikasi" queue (the auditee does NOT set
+  // the closing status; Komite does during verification). Seeded once.
+  if (ref2 && (await db.capa.count({ where: { finding: { audit: { areaId: ref2.id } } } })) === 0) {
+    const ref2Findings = await db.finding.findMany({
+      where: { audit: { areaId: ref2.id }, capa: { is: null } },
+      orderBy: { createdAt: "asc" },
+      take: 2,
+    });
+    const capaSeeds = [
+      {
+        rootCause: "Seal pompa P-101 bocor sehingga oli menetes ke lantai.",
+        correctiveAction: "Membersihkan ceceran dan mengganti seal pompa.",
+        preventiveAction: "Menjadwalkan inspeksi seal pompa setiap minggu.",
+        woScPoNumber: "WO-2026-0456", // sudah ada WO → Komite bisa set Progress
+      },
+      {
+        rootCause: "Garis demarkasi pudar dan drum tidak dikembalikan ke tempatnya.",
+        correctiveAction: "Mengecat ulang garis dan menata ulang drum.",
+        preventiveAction: "Audit penataan harian oleh PIC shift.",
+        woScPoNumber: null, // belum ada WO → Progress diblokir sampai dilengkapi
+      },
+    ];
+    for (let i = 0; i < ref2Findings.length && i < capaSeeds.length; i++) {
+      await db.capa.create({
+        data: { findingId: ref2Findings[i].id, ...capaSeeds[i] },
+      });
+    }
+  }
+
+  // Backfill (idempotent): make sure at least one REF-2 CAPA carries a WO number
+  // (so Komite can demo "Progress") even on already-seeded DBs. Sets it on a
+  // single CAPA only when none has one yet.
+  if (ref2) {
+    const anyWo = await db.capa.count({
+      where: { woScPoNumber: { not: null }, finding: { audit: { areaId: ref2.id } } },
+    });
+    if (anyWo === 0) {
+      const target = await db.capa.findFirst({
+        where: { woScPoNumber: null, finding: { audit: { areaId: ref2.id } } },
+        orderBy: { createdAt: "asc" },
+      });
+      if (target) {
+        await db.capa.update({
+          where: { id: target.id },
+          data: { woScPoNumber: "WO-2026-0456" },
+        });
+      }
+    }
+    // Keep the REF-2 audit on-time (≤ tgl 10) for the Skor Auditor demo.
+    await db.audit.updateMany({
+      where: { areaId: ref2.id, period, status: "SUBMITTED" },
+      data: { submittedAt: new Date(`${period}-08T09:00:00`) },
+    });
   }
 
   // Daily Checklist items (24) — seed once.
@@ -262,18 +439,26 @@ async function main() {
     }
   }
 
-  // Sample Red Tags for REF-2 (varied urgency) — seed once.
+  // Sample Red Tags for REF-2 (varied urgency) — seed once. The first one is
+  // linked to the REF-2 "Material/Suku cadang" finding to show the CAPA→Red Tag
+  // flow (a Ringkas finding whose follow-up is to red-tag the item).
   if (ref2 && (await db.redTag.count()) === 0) {
     const day = 1000 * 60 * 60 * 24;
     const now = Date.now();
     const year = new Date().getFullYear();
+    const materialFinding = await db.finding.findFirst({
+      where: {
+        audit: { areaId: ref2.id },
+        guidingQuestion: { subCategory: "Material dan atau Suku cadang" },
+      },
+    });
     const seeds = [
       // approaching: registered 27 days ago, IN_AREA (30d) -> due in ~3 days
-      { name: "Motor pompa cadangan rusak", category: "Suku Cadang", reason: "Rusak, tidak dapat diperbaiki", location: "IN_AREA" as const, regAgo: 27, status: "OPEN" as const },
+      { name: "Motor pompa cadangan rusak", category: "Suku Cadang", reason: "Rusak, tidak dapat diperbaiki", location: "IN_AREA" as const, regAgo: 27, status: "OPEN" as const, findingId: materialFinding?.id ?? null },
       // overdue: registered 95 days ago, RT_AREA (90d) -> overdue ~5 days
-      { name: "Drum bekas pelarut", category: "Material", reason: "Tidak terpakai di proses saat ini", location: "RT_AREA" as const, regAgo: 95, status: "OPEN" as const },
+      { name: "Drum bekas pelarut", category: "Material", reason: "Tidak terpakai di proses saat ini", location: "RT_AREA" as const, regAgo: 95, status: "OPEN" as const, findingId: null },
       // decided
-      { name: "Panel kontrol lama", category: "Peralatan / Tooling", reason: "Sudah diganti unit baru", location: "RT_AREA" as const, regAgo: 40, status: "DISPOSED" as const },
+      { name: "Panel kontrol lama", category: "Peralatan / Tooling", reason: "Sudah diganti unit baru", location: "RT_AREA" as const, regAgo: 40, status: "DISPOSED" as const, findingId: null },
     ];
     let seq = 1;
     for (const s of seeds) {
@@ -283,6 +468,7 @@ async function main() {
         data: {
           tagNumber: `RT-${year}-${String(seq++).padStart(3, "0")}`,
           areaId: ref2.id,
+          findingId: s.findingId,
           name: s.name,
           category: s.category,
           reason: s.reason,
@@ -296,7 +482,64 @@ async function main() {
     }
   }
 
-  const [areaCount, userCount, scoreCount, gqCount, schedCount, itemCount] =
+  // Backfill (idempotent): link the "Motor pompa" red tag to the REF-2
+  // Material finding to demo the CAPA→Red Tag flow on already-seeded DBs.
+  if (ref2) {
+    const materialFinding = await db.finding.findFirst({
+      where: {
+        audit: { areaId: ref2.id },
+        guidingQuestion: { subCategory: "Material dan atau Suku cadang" },
+      },
+    });
+    if (materialFinding) {
+      await db.redTag.updateMany({
+        where: { areaId: ref2.id, findingId: null, name: "Motor pompa cadangan rusak" },
+        data: { findingId: materialFinding.id },
+      });
+    }
+  }
+
+  // Backfill (idempotent): assign sequential per-audit finding numbers to any
+  // findings created without one (number == 0). Once numbered they are skipped.
+  const auditsToNumber = await db.finding.findMany({
+    where: { number: 0 },
+    select: { auditId: true },
+    distinct: ["auditId"],
+  });
+  for (const { auditId } of auditsToNumber) {
+    const fs = await db.finding.findMany({
+      where: { auditId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, number: true },
+    });
+    let n = fs.reduce((m, f) => Math.max(m, f.number), 0);
+    for (const f of fs) {
+      if (f.number === 0) {
+        n += 1;
+        await db.finding.update({ where: { id: f.id }, data: { number: n } });
+      }
+    }
+  }
+
+  // Reference documents (Module 7) — seed once.
+  if ((await db.document.count()) === 0) {
+    for (const d of DOCUMENTS) {
+      await db.document.create({ data: { ...d, uploadedBy: "Komite Unit" } });
+    }
+  }
+
+  // Seed a few audit-log entries so the log isn't empty on first load.
+  if ((await db.auditLog.count()) === 0) {
+    await db.auditLog.createMany({
+      data: [
+        { action: "system.seed", entity: "System", summary: "Inisialisasi data master & seed.", userName: "Sistem", userEmail: "-" },
+        { action: "schedule.generate", entity: "AuditSchedule", summary: `Membuat jadwal audit periode ${period} untuk 12 area.`, userName: "Halim (Komite Unit)", userEmail: "komite@5r.local" },
+        { action: "audit.submit", entity: "Audit", summary: "Audit Refinery Lt 2 dikirim dengan 5 temuan.", userName: "Muhib (Auditor)", userEmail: "auditor1@5r.local" },
+      ],
+    });
+  }
+
+  const [areaCount, userCount, scoreCount, gqCount, schedCount, itemCount, docCount] =
     await Promise.all([
       db.area.count(),
       db.user.count(),
@@ -304,11 +547,12 @@ async function main() {
       db.guidingQuestion.count(),
       db.auditSchedule.count(),
       db.checklistItem.count(),
+      db.document.count(),
     ]);
   console.log(
     `Done. Areas: ${areaCount}, Users: ${userCount}, Scores: ${scoreCount}, ` +
       `GuidingQuestions: ${gqCount}, Schedules: ${schedCount}, ` +
-      `ChecklistItems: ${itemCount} (period ${period})`
+      `ChecklistItems: ${itemCount}, Documents: ${docCount} (period ${period})`
   );
 }
 

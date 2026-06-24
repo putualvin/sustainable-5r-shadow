@@ -83,25 +83,25 @@ At this point you have a working demo. Stop, run through the full flow as differ
 
 ## Module 6 — Monthly report (1 session)
 
-- [ ] Report page: executive summary, KPIs, trend chart, per-area table, top categories, compliance donut
-- [ ] Recurring findings panel (keyword/category matching — keep it simple)
-- [ ] Auditor & PIC ranking
-- [ ] Print to PDF works
+- [x] Report page: executive summary, KPIs, trend chart, per-area table, top categories, compliance donut
+- [x] Recurring findings panel (keyword/category matching — keep it simple)
+- [x] Auditor & PIC ranking
+- [x] Print to PDF works
 
 ## Module 7 — Schedule, Documents, Admin (1-2 sessions)
 
-- [ ] Audit schedule calendar (komite can auto-generate + shuffle)
-- [ ] Document repository with categories and version badges
-- [ ] Admin: user/role management table
-- [ ] Audit log of all actions
+- [x] Audit schedule calendar (komite can auto-generate + shuffle)
+- [x] Document repository with categories and version badges
+- [x] Admin: user/role management table
+- [x] Audit log of all actions
 
 ## Module 8 — Polish (1 session)
 
-- [ ] Responsive check on real mobile (use ngrok or Vercel preview)
-- [ ] Empty/loading/error states everywhere
-- [ ] 403 page for unauthorised access
-- [ ] Offline banner + localStorage write for audit/checklist when offline
-- [ ] Lighthouse pass (aim for >90 on Performance, Accessibility)
+- [x] Responsive check on real mobile (use ngrok or Vercel preview)
+- [x] Empty/loading/error states everywhere
+- [x] 403 page for unauthorised access
+- [x] Offline banner + localStorage write for audit/checklist when offline
+- [ ] Lighthouse pass (aim for >90 on Performance, Accessibility) — not run in this environment
 
 ---
 

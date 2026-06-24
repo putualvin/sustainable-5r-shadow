@@ -1,10 +1,194 @@
-import { Placeholder } from "@/components/shared/placeholder";
+import { CalendarClock, Shuffle, Sparkles } from "lucide-react";
 
-export default function SchedulePage() {
+import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { formatPeriod, formatDate } from "@/lib/format";
+import { generateSchedule, shuffleSchedule } from "@/lib/actions/schedule";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PeriodTabs } from "@/components/shared/period-tabs";
+import { ScheduleAuditorSelect } from "@/components/forms/schedule-auditor-select";
+
+function currentPeriod(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+function periodPlus(n: number): string {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+const STATUS = {
+  none: { label: "Belum mulai", cls: "bg-muted text-muted-foreground" },
+  DRAFT: { label: "Draft", cls: "bg-warning/10 text-warning" },
+  SUBMITTED: { label: "Terkirim", cls: "bg-success/10 text-success" },
+} as const;
+
+export default async function SchedulePage({
+  searchParams,
+}: {
+  searchParams: { period?: string; error?: string };
+}) {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const canManage = user.roles.includes("komite_unit") || user.roles.includes("admin");
+
+  // Periods that have schedules, plus the current + upcoming months so a fresh
+  // period can always be selected & generated.
+  const periodRows = await db.auditSchedule.findMany({
+    distinct: ["period"],
+    select: { period: true },
+    orderBy: { period: "desc" },
+  });
+  const existing = periodRows.map((p) => p.period);
+  const cur = currentPeriod();
+  const periods = Array.from(
+    new Set([...existing, cur, periodPlus(1), periodPlus(2)])
+  ).sort((a, b) => b.localeCompare(a));
+  const defaultPeriod = existing.includes(cur) ? cur : existing[0] ?? cur;
+  const period =
+    searchParams.period && periods.includes(searchParams.period)
+      ? searchParams.period
+      : defaultPeriod;
+
+  const [schedules, audits] = await Promise.all([
+    db.auditSchedule.findMany({
+      where: { period },
+      include: { area: true, auditor: { select: { name: true } } },
+      orderBy: { area: { code: "asc" } },
+    }),
+    db.audit.findMany({
+      where: { period },
+      select: { scheduleId: true, status: true },
+    }),
+  ]);
+
+  const statusBySchedule = new Map(
+    audits.filter((a) => a.scheduleId).map((a) => [a.scheduleId!, a.status])
+  );
+
+  // Active auditors for manual assignment (komite/admin only).
+  const auditors = canManage
+    ? await db.user.findMany({
+        where: { roles: { has: "auditor" }, active: true },
+        select: { id: true, name: true, areaId: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
+
   return (
-    <Placeholder
-      title="Jadwal Audit"
-      description="Penjadwalan audit oleh Komite Unit — Module 7."
-    />
+    <div className="max-w-6xl space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Jadwal Audit</h1>
+          <p className="text-sm text-muted-foreground">
+            Penugasan auditor per area · {formatPeriod(period)}
+          </p>
+        </div>
+        {canManage && (
+          <div className="flex gap-2 print:hidden">
+            <form action={generateSchedule}>
+              <input type="hidden" name="period" value={period} />
+              <Button size="sm" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                {schedules.length === 0 ? "Buat Jadwal" : "Perbarui Jadwal"}
+              </Button>
+            </form>
+            {schedules.length > 0 && (
+              <form action={shuffleSchedule}>
+                <input type="hidden" name="period" value={period} />
+                <Button size="sm" variant="outline" className="gap-2">
+                  <Shuffle className="h-4 w-4" /> Acak Ulang
+                </Button>
+              </form>
+            )}
+          </div>
+        )}
+      </div>
+
+      <PeriodTabs periods={periods} active={period} basePath="/schedule" />
+
+      {canManage && schedules.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          “Buat/Perbarui Jadwal” menugaskan auditor otomatis bergiliran. Ubah
+          auditor tiap area lewat dropdown (selama audit belum dimulai).
+        </p>
+      )}
+
+      {searchParams.error === "no-auditors" && (
+        <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+          Tidak ada auditor aktif. Tambahkan auditor di menu Admin terlebih dahulu.
+        </p>
+      )}
+
+      {schedules.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-12 text-center">
+          <CalendarClock className="h-10 w-10 text-muted-foreground" />
+          <p className="font-medium">Belum ada jadwal untuk periode ini</p>
+          {canManage ? (
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Klik “Buat Jadwal” untuk menugaskan auditor ke seluruh area secara bergiliran.
+            </p>
+          ) : (
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Komite Unit belum menyusun jadwal untuk periode ini.
+            </p>
+          )}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="px-0 py-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="px-4 py-2 font-medium">Area</th>
+                    <th className="px-4 py-2 font-medium">Auditor</th>
+                    <th className="px-4 py-2 font-medium">Batas Waktu</th>
+                    <th className="px-4 py-2 text-right font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedules.map((s) => {
+                    const st = statusBySchedule.get(s.id);
+                    const badge = st ? STATUS[st] : STATUS.none;
+                    return (
+                      <tr key={s.id} className="border-b last:border-0">
+                        <td className="px-4 py-2 font-medium">{s.area.name}</td>
+                        <td className="px-4 py-2">
+                          {canManage && !statusBySchedule.has(s.id) ? (
+                            <ScheduleAuditorSelect
+                              scheduleId={s.id}
+                              areaId={s.areaId}
+                              currentAuditorId={s.auditorId}
+                              auditors={auditors}
+                            />
+                          ) : (
+                            s.auditor.name
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground">
+                          {s.dueDate ? formatDate(s.dueDate) : "—"}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge.cls}`}
+                          >
+                            {badge.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

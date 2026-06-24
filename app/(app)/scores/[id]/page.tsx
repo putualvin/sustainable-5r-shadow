@@ -17,7 +17,7 @@ export default async function ScoreDetailPage({
   params: { id: string };
 }) {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "scores")) redirect("/403");
+  if (!user || !canAccess(user.roles, "scores")) redirect("/403");
 
   const area = await db.area.findUnique({ where: { id: params.id } });
   if (!area) notFound();
@@ -30,7 +30,7 @@ export default async function ScoreDetailPage({
 
   if (!latest) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="max-w-4xl space-y-4">
         <BackLink />
         <h1 className="text-2xl font-bold">{area.name}</h1>
         <p className="text-sm text-muted-foreground">Belum ada data skor.</p>
@@ -56,7 +56,7 @@ export default async function ScoreDetailPage({
   }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <BackLink />
         <PrintButton />
@@ -105,17 +105,38 @@ export default async function ScoreDetailPage({
               <Row label="Proses (Progress)" count={breakdown.countProgress} pct={breakdown.progressPct} weight="+1" value={breakdown.valueProgress} />
               <Row label="Belum (No Progress)" count={breakdown.countNoProgress} pct={breakdown.noProgressPct} weight="-1" value={breakdown.valueNoProgress} />
               <tr className="border-t font-semibold">
-                <td className="py-2">Total</td>
+                <td className="py-2">Nilai Utama</td>
                 <td className="py-2 text-right">{breakdown.countTotal}</td>
                 <td className="py-2 text-right">100%</td>
                 <td className="py-2 text-right">/2</td>
-                <td className="py-2 text-right">{latest.finalScore}%</td>
+                <td className="py-2 text-right">{latest.nilaiUtama}%</td>
               </tr>
             </tbody>
           </table>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Skor = ((nilai Done + nilai Progress + nilai No Progress) / 2) × 100,
-            dibulatkan.
+
+          {/* Lapis 2 — Score Akhir = Nilai Utama − Temuan Berulang − Parking Lot */}
+          <dl className="mt-4 space-y-1.5 rounded-lg bg-muted/60 p-3 text-sm tabular-nums">
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Nilai Utama</dt>
+              <dd className="font-medium">{latest.nilaiUtama}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">− Temuan Berulang</dt>
+              <dd className="font-medium text-danger">−{latest.temuanBerulang}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">− Parking Lot ({latest.parkingLot} temuan)</dt>
+              <dd className="text-muted-foreground">0</dd>
+            </div>
+            <div className="flex justify-between border-t pt-1.5 text-base font-bold">
+              <dt>Score Akhir</dt>
+              <dd className="text-primary">{latest.finalScore}%</dd>
+            </div>
+          </dl>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Nilai Utama = ((nilai Done + Progress + No Progress) / 2) × 100. Score
+            Akhir = Nilai Utama − Temuan Berulang (Parking Lot dilacak, tidak
+            mengurangi). Lihat §5.4.
           </p>
         </CardContent>
       </Card>

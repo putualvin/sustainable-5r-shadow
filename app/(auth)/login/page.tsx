@@ -7,15 +7,6 @@ import {
 } from "@/components/ui/card";
 import { LoginForm } from "@/components/forms/login-form";
 
-const DEMO_ACCOUNTS = [
-  { email: "admin@5r.local", label: "Admin" },
-  { email: "komite@5r.local", label: "Komite Unit" },
-  { email: "auditor1@5r.local", label: "Auditor" },
-  { email: "pic.refinery2@5r.local", label: "Auditee / PIC" },
-  { email: "redtag@5r.local", label: "Koord. Red Tag" },
-  { email: "gm@5r.local", label: "Management" },
-];
-
 export default function LoginPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
@@ -43,20 +34,6 @@ export default function LoginPage() {
             <LoginForm />
           </CardContent>
         </Card>
-
-        <div className="rounded-lg border bg-card p-3 text-xs text-muted-foreground">
-          <p className="mb-1.5 font-medium text-foreground">
-            Akun demo (sandi bebas):
-          </p>
-          <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
-            {DEMO_ACCOUNTS.map((a) => (
-              <li key={a.email} className="flex flex-col">
-                <span className="font-medium text-foreground">{a.label}</span>
-                <span className="truncate">{a.email}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
     </main>
   );

@@ -87,3 +87,68 @@ export function gradeFor(score: number): Grade {
   if (score >= 60) return { label: "Cukup", tone: "warning" };
   return { label: "Perlu Perbaikan", tone: "danger" };
 }
+
+// ===== Lapis 2 — Score Akhir Sustainable 5R (CLAUDE.md §5.4) =====
+//   Score Akhir = Nilai Utama − Temuan Berulang − Parking Lot
+// - Temuan Berulang: −1 poin per temuan berulang.
+// - Parking Lot: kumpulan temuan Not Done (Progress/No Progress). Untuk shadow
+//   build, bobot pengurang Parking Lot = 0 (hanya dilacak; penalti Not Done sudah
+//   tercermin di Nilai Utama). Lihat docs/decisions.md.
+export type FinalScoreInput = ScoreInput & { recurring?: number };
+
+export type FinalScore = {
+  nilaiUtama: number; // Lapis 1 (integer %)
+  temuanBerulang: number; // jumlah temuan berulang (−1 poin masing-masing)
+  parkingLot: number; // jumlah temuan Not Done (tracking; pengurang 0)
+  scoreAkhir: number; // Lapis 2 (integer %, di-clamp 0..100)
+};
+
+const PARKING_LOT_WEIGHT = 0; // tracking only — see §5.4 decision
+
+export function calculateFinalScore(input: FinalScoreInput): FinalScore {
+  const base = calculate5RScore(input);
+  const nilaiUtama = base.finalScore;
+  const temuanBerulang = Math.max(0, Math.trunc(input.recurring ?? 0));
+  const parkingLot = base.countProgress + base.countNoProgress;
+  const scoreAkhir = Math.max(
+    0,
+    Math.min(100, nilaiUtama - temuanBerulang - PARKING_LOT_WEIGHT * parkingLot)
+  );
+  return { nilaiUtama, temuanBerulang, parkingLot, scoreAkhir };
+}
+
+// ===== Scoring Auditor (§5.5) — 4 komponen @25% =====
+export const FINDING_TARGET = 21;
+
+export type AuditorScoreInput = {
+  onTime: boolean; // audit dikirim ≤ tgl 10
+  findingsCount: number;
+  low: number; // jumlah temuan kategori Low
+  high: number; // jumlah temuan kategori High
+  isOwnArea: boolean; // auditor adalah PIC area yang diaudit (konflik)
+  target?: number;
+};
+
+export type AuditorScore = {
+  timeliness: number; // ketepatan waktu (0/100)
+  achievement: number; // pencapaian target temuan (0..100)
+  quality: number; // kualitas temuan (Low=1, High=2 → 0..100)
+  independence: number; // bukan auditor area (0/100)
+  total: number; // rata-rata 4 komponen (integer)
+};
+
+export function calculateAuditorScore(i: AuditorScoreInput): AuditorScore {
+  const target = i.target ?? FINDING_TARGET;
+  const timeliness = i.onTime ? 100 : 0;
+  const achievement =
+    target > 0 ? Math.min(100, Math.round((i.findingsCount / target) * 100)) : 0;
+  const counted = i.low + i.high;
+  // Low=1, High=2; maksimum per temuan = 2 → kualitas 100% bila semua High.
+  const quality =
+    counted > 0 ? Math.round(((i.low + i.high * 2) / (counted * 2)) * 100) : 0;
+  const independence = i.isOwnArea ? 0 : 100;
+  const total = Math.round(
+    (timeliness + achievement + quality + independence) / 4
+  );
+  return { timeliness, achievement, quality, independence, total };
+}

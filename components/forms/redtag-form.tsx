@@ -18,9 +18,11 @@ const selectClass =
 export function RedTagForm({
   areas,
   defaultAreaId,
+  findingId,
 }: {
   areas: Area[];
   defaultAreaId?: string | null;
+  findingId?: string;
 }) {
   const [state, formAction] = useFormState<RedTagActionState, FormData>(
     createRedTag,
@@ -29,6 +31,7 @@ export function RedTagForm({
 
   return (
     <form action={formAction} className="space-y-4">
+      {findingId && <input type="hidden" name="findingId" value={findingId} />}
       <div className="space-y-2">
         <Label htmlFor="areaId">Area</Label>
         <select

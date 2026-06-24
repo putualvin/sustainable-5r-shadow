@@ -20,11 +20,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import type { Role } from "@prisma/client";
 import type { NavItem, Section } from "@/lib/rbac";
-import { roleLabel } from "@/lib/rbac";
+import { rolesLabel } from "@/lib/rbac";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { RoleSwitcher } from "@/components/shared/role-switcher";
 
 const ICONS: Record<Section, LucideIcon> = {
   home: Home,
@@ -44,7 +46,7 @@ export function AppShell({
   items,
   children,
 }: {
-  user: { name: string; email: string; role: Parameters<typeof roleLabel>[0] };
+  user: { name: string; email: string; roles: Role[] };
   items: NavItem[];
   children: React.ReactNode;
 }) {
@@ -53,6 +55,8 @@ export function AppShell({
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  const activeLabel = items.find((i) => isActive(i.href))?.label ?? "Beranda";
 
   // Mobile bottom nav: show up to 5; overflow into "Lainnya".
   const primary = items.length > 5 ? items.slice(0, 4) : items;
@@ -92,22 +96,36 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top bar (mobile) */}
-        <header className="flex h-14 items-center justify-between border-b bg-card px-4 md:hidden">
+        {/* Top bar (mobile) — brand red */}
+        <header className="flex h-14 items-center justify-between bg-primary px-4 text-primary-foreground md:hidden">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-xs font-bold text-primary">
               5R
             </span>
-            <span className="font-semibold">Sustainable 5R</span>
+            <div className="leading-tight">
+              <p className="text-[10px] font-medium uppercase tracking-wider opacity-80">
+                Sustainable 5R
+              </p>
+              <p className="text-sm font-semibold">{activeLabel}</p>
+            </div>
           </div>
-          <form action={logoutAction}>
-            <Button type="submit" variant="ghost" size="icon" aria-label="Keluar">
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </form>
+          <div className="flex items-center gap-1">
+            <RoleSwitcher currentEmail={user.email} variant="icon" align="down" />
+            <form action={logoutAction}>
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                aria-label="Keluar"
+                className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </form>
+          </div>
         </header>
 
-        <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">{children}</main>
+        <main className="flex-1 p-4 pb-24 md:px-8 md:py-7 md:pb-7">{children}</main>
       </div>
 
       {/* Overflow sheet (mobile) */}
@@ -150,16 +168,24 @@ export function AppShell({
       >
         {primary.map((item) => {
           const Icon = ICONS[item.section];
+          const active = isActive(item.href);
           return (
             <Link
               key={item.section}
               href={item.href}
               className={cn(
-                "flex min-h-[56px] flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium",
-                isActive(item.href) ? "text-primary" : "text-muted-foreground"
+                "flex min-h-[56px] flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium",
+                active ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <Icon className="h-5 w-5" />
+              <span
+                className={cn(
+                  "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+                  active && "bg-primary text-primary-foreground"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+              </span>
               {item.label}
             </Link>
           );
@@ -181,7 +207,7 @@ export function AppShell({
 function UserBox({
   user,
 }: {
-  user: { name: string; email: string; role: Parameters<typeof roleLabel>[0] };
+  user: { name: string; email: string; roles: Role[] };
 }) {
   return (
     <div className="border-t p-3">
@@ -192,9 +218,12 @@ function UserBox({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{user.name}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {roleLabel(user.role)}
+            {rolesLabel(user.roles)}
           </p>
         </div>
+      </div>
+      <div className="mt-2">
+        <RoleSwitcher currentEmail={user.email} variant="full" align="up" />
       </div>
       <form action={logoutAction}>
         <Button

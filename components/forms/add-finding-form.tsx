@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import type { Pillar } from "@prisma/client";
 
 import { addFinding, type FindingActionState } from "@/lib/actions/audit";
+import { useLocalDraft } from "@/lib/use-local-draft";
 import { PILLARS } from "@/lib/pillars";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,25 @@ type GQ = {
   pillar: Pillar;
   subCategory: string;
   description: string;
+};
+
+// Draft fields persisted to localStorage so input survives reload / back-nav /
+// going offline (rules #7 and #8). Photos aren't persisted (binary, optional).
+type Draft = {
+  pillar: Pillar | "";
+  gqId: string;
+  locationDetail: string;
+  description: string;
+  kategori: "LOW" | "HIGH" | "";
+  isRecurring: boolean;
+};
+const EMPTY: Draft = {
+  pillar: "",
+  gqId: "",
+  locationDetail: "",
+  description: "",
+  kategori: "",
+  isRecurring: false,
 };
 
 const selectClass =
@@ -33,31 +53,29 @@ export function AddFindingForm({
     addFinding,
     {}
   );
-  const [pillar, setPillar] = useState<Pillar | "">("");
-  const [gqId, setGqId] = useState("");
+  const [draft, setDraft] = useLocalDraft<Draft>(
+    `draft:finding:${auditId}`,
+    EMPTY
+  );
   const [photoKey, setPhotoKey] = useState(0);
-  const formRef = useRef<HTMLFormElement>(null);
 
   const subOptions = useMemo(
-    () => guidingQuestions.filter((g) => g.pillar === pillar),
-    [guidingQuestions, pillar]
+    () => guidingQuestions.filter((g) => g.pillar === draft.pillar),
+    [guidingQuestions, draft.pillar]
   );
-  const selectedGq = guidingQuestions.find((g) => g.id === gqId);
+  const selectedGq = guidingQuestions.find((g) => g.id === draft.gqId);
 
-  // Reset the form after a successful add so the auditor can log the next one.
-  // Reset native fields via the form ref + remount only the PhotoInput (not the
-  // whole form, which is bound to useFormState).
+  // Clear the draft after a successful add so the next finding starts fresh.
   useEffect(() => {
     if (state?.ok) {
-      formRef.current?.reset();
-      setPillar("");
-      setGqId("");
+      setDraft(EMPTY);
       setPhotoKey((k) => k + 1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4">
       <input type="hidden" name="auditId" value={auditId} />
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -66,11 +84,10 @@ export function AddFindingForm({
           <select
             id="pillar"
             className={selectClass}
-            value={pillar}
-            onChange={(e) => {
-              setPillar(e.target.value as Pillar);
-              setGqId("");
-            }}
+            value={draft.pillar}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, pillar: e.target.value as Pillar, gqId: "" }))
+            }
           >
             <option value="">Pilih kategori…</option>
             {PILLARS.map((p) => (
@@ -87,12 +104,12 @@ export function AddFindingForm({
             id="guidingQuestionId"
             name="guidingQuestionId"
             className={selectClass}
-            value={gqId}
-            onChange={(e) => setGqId(e.target.value)}
-            disabled={!pillar}
+            value={draft.gqId}
+            onChange={(e) => setDraft((d) => ({ ...d, gqId: e.target.value }))}
+            disabled={!draft.pillar}
           >
             <option value="">
-              {pillar ? "Pilih sub-kategori…" : "Pilih kategori dulu"}
+              {draft.pillar ? "Pilih sub-kategori…" : "Pilih kategori dulu"}
             </option>
             {subOptions.map((g) => (
               <option key={g.id} value={g.id}>
@@ -115,6 +132,10 @@ export function AddFindingForm({
           id="locationDetail"
           name="locationDetail"
           placeholder="mis. dekat pompa P-101"
+          value={draft.locationDetail}
+          onChange={(e) =>
+            setDraft((d) => ({ ...d, locationDetail: e.target.value }))
+          }
         />
       </div>
 
@@ -124,7 +145,44 @@ export function AddFindingForm({
           id="description"
           name="description"
           placeholder="Jelaskan ketidaksesuaian yang ditemukan…"
+          value={draft.description}
+          onChange={(e) =>
+            setDraft((d) => ({ ...d, description: e.target.value }))
+          }
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="kategori">Kategori temuan</Label>
+          <select
+            id="kategori"
+            name="kategori"
+            className={selectClass}
+            value={draft.kategori}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, kategori: e.target.value as "LOW" | "HIGH" }))
+            }
+          >
+            <option value="">Pilih kategori…</option>
+            <option value="LOW">Low</option>
+            <option value="HIGH">High</option>
+          </select>
+        </div>
+        <div className="flex items-end">
+          <label className="flex h-11 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
+            <input
+              type="checkbox"
+              name="isRecurring"
+              checked={draft.isRecurring}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, isRecurring: e.target.checked }))
+              }
+              className="h-4 w-4"
+            />
+            Temuan berulang (bulan lalu &amp; ini)
+          </label>
+        </div>
       </div>
 
       <div className="space-y-2">

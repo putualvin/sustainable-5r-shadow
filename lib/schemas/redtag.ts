@@ -6,6 +6,7 @@ export const redTagSchema = z.object({
   category: z.string().min(1, "Pilih kategori"),
   reason: z.string().min(3, "Alasan minimal 3 karakter").max(500),
   location: z.enum(["IN_AREA", "RT_AREA"]),
+  findingId: z.string().optional(),
 });
 
 export type RedTagInput = z.infer<typeof redTagSchema>;

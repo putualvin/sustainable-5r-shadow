@@ -4,28 +4,30 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    /* Light "High-Performance Precision" surfaces (#fbf8ff base) */
+    --background: 255 100% 99%;
+    --foreground: 230 16% 12%; /* #1a1b22 */
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 230 16% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 230 16% 12%;
 
-    /* Sinar Mas red #C8102E */
-    --primary: 350 85% 42%;
-    --primary-dark: 350 84% 34%; /* #A00D24 */
+    /* Sinar Mas red #E30613 (§3) */
+    --primary: 357 95% 46%;
+    --primary-dark: 357 95% 38%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 252 24% 95%;
+    --secondary-foreground: 230 16% 12%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    /* surface-container — soft lavender grey #eeedf7 */
+    --muted: 249 26% 95%;
+    --muted-foreground: 240 4% 46%; /* #71717a */
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 249 26% 95%;
+    --accent-foreground: 230 16% 12%;
 
     --destructive: 0 65% 51%; /* #D32F2F */
     --destructive-foreground: 0 0% 100%;
@@ -40,11 +42,11 @@
     --danger: 0 65% 51%; /* #D32F2F */
     --danger-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 350 85% 42%;
+    --border: 240 20% 91%; /* light lavender-grey #E4E4E7 */
+    --input: 240 20% 91%;
+    --ring: 357 95% 46%;
 
-    --radius: 0.5rem; /* 8px */
+    --radius: 0.75rem; /* 12px — design base radius */
   }
 }
 

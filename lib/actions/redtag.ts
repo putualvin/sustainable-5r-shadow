@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccess } from "@/lib/rbac";
-import { savePhoto } from "@/lib/upload";
+import { photoDataUrl } from "@/lib/upload";
 import { RETENTION_DAYS } from "@/lib/redtag";
 import { redTagSchema, redTagDecisionSchema } from "@/lib/schemas/redtag";
 
@@ -19,7 +19,7 @@ export async function createRedTag(
   formData: FormData
 ): Promise<RedTagActionState> {
   const user = await getCurrentUser();
-  if (!user || !canAccess(user.role, "redtag")) return { error: "Akses ditolak." };
+  if (!user || !canAccess(user.roles, "redtag")) return { error: "Akses ditolak." };
 
   const parsed = redTagSchema.safeParse({
     areaId: formData.get("areaId"),
@@ -27,9 +27,25 @@ export async function createRedTag(
     category: formData.get("category"),
     reason: formData.get("reason"),
     location: formData.get("location"),
+    findingId: formData.get("findingId") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+  }
+
+  // If raised from a CAPA/finding, link it and anchor the area to the finding's
+  // area (keeps the red tag consistent with its source).
+  let findingId: string | null = null;
+  let areaId = parsed.data.areaId;
+  if (parsed.data.findingId) {
+    const finding = await db.finding.findUnique({
+      where: { id: parsed.data.findingId },
+      include: { audit: { select: { areaId: true } } },
+    });
+    if (finding) {
+      findingId = finding.id;
+      areaId = finding.audit.areaId;
+    }
   }
 
   const year = new Date().getFullYear();
@@ -44,13 +60,13 @@ export async function createRedTag(
     registeredAt.getTime() + RETENTION_DAYS[parsed.data.location] * DAY
   );
 
-  const photo = formData.get("photo");
-  const photoPath = photo instanceof File ? await savePhoto(photo) : null;
+  const photoPath = photoDataUrl(formData.get("photo"));
 
   await db.redTag.create({
     data: {
       tagNumber,
-      areaId: parsed.data.areaId,
+      areaId,
+      findingId,
       name: parsed.data.name,
       category: parsed.data.category,
       reason: parsed.data.reason,
@@ -63,13 +79,17 @@ export async function createRedTag(
 
   revalidatePath("/redtag");
   revalidatePath("/");
+  if (findingId) {
+    revalidatePath(`/capa/${findingId}`);
+    redirect(`/capa/${findingId}?redtag=1`);
+  }
   redirect("/redtag?created=1");
 }
 
 // Disposal decision — coordinator only.
 export async function decideRedTag(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || (user.role !== "kord_red_tag" && user.role !== "admin")) {
+  if (!user || (!user.roles.includes("kord_red_tag") && !user.roles.includes("admin"))) {
     redirect("/403");
   }
 
@@ -79,12 +99,14 @@ export async function decideRedTag(formData: FormData): Promise<void> {
   });
   if (!parsed.success) redirect("/redtag");
 
-  await db.redTag.update({
+  const updated = await db.redTag.update({
     where: { id: parsed.data.id },
     data: { status: parsed.data.decision, decidedAt: new Date() },
   });
 
   revalidatePath("/redtag");
   revalidatePath(`/redtag/${parsed.data.id}`);
+  revalidatePath("/"); // home red-tag queue + KPI
+  if (updated.findingId) revalidatePath(`/capa/${updated.findingId}`);
   redirect(`/redtag/${parsed.data.id}`);
 }

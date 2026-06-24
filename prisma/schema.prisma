@@ -39,6 +39,12 @@ enum FindingStatus {
   PENDING_CAPA
 }
 
+// Auditor-assigned category of a finding (§5.1). NOT the closing status.
+enum Kategori {
+  LOW
+  HIGH
+}
+
 // CAPA closing status — drives the area score (see lib/scoring.ts).
 enum CapaStatus {
   DONE
@@ -66,11 +72,22 @@ enum AreaGroup {
   FRACTIONATION
 }
 
+// Document repository categories (Module 7).
+enum DocCategory {
+  PANDUAN // panduan / guidelines
+  SOP // standard operating procedure
+  STANDARD // standar area
+  TEMPLATE // template / contoh
+  FORMULIR // formulir / checklist cetak
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  role      Role     @default(auditee)
+  // A user may hold MULTIPLE roles (e.g. an area PIC who is also an auditor).
+  // Access is the union of all roles' permissions (see lib/rbac.ts).
+  roles     Role[]   @default([auditee])
   // PIC (auditee) is tied to one area; other roles leave this null.
   areaId    String?
   area      Area?    @relation(fields: [areaId], references: [id])
@@ -107,7 +124,11 @@ model Score {
   countDone       Int      @default(0)
   countProgress   Int      @default(0)
   countNoProgress Int      @default(0)
-  finalScore      Int      @default(0) // computed via lib/scoring.ts
+  // Two-layer scoring (§5.4), all computed via lib/scoring.ts:
+  nilaiUtama      Int      @default(0) // Lapis 1
+  temuanBerulang  Int      @default(0) // count recurring (−1 each)
+  parkingLot      Int      @default(0) // count Not-Done (tracking; weight 0)
+  finalScore      Int      @default(0) // Score Akhir (Lapis 2)
   createdAt       DateTime @default(now())
 
   @@unique([areaId, period])
@@ -162,7 +183,8 @@ model Audit {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  findings Finding[]
+  findings       Finding[]
+  findingReviews FindingReview[]
 
   @@index([auditorId])
   @@index([areaId, period])
@@ -172,35 +194,67 @@ model Finding {
   id                String          @id @default(cuid())
   audit             Audit           @relation(fields: [auditId], references: [id], onDelete: Cascade)
   auditId           String
+  number            Int             @default(0) // nomor temuan urut per audit (area+periode)
   guidingQuestion   GuidingQuestion @relation(fields: [guidingQuestionId], references: [id])
   guidingQuestionId String
   locationDetail    String? // specific spot within the area
   description       String
+  kategori          Kategori        @default(LOW) // auditor-assigned (§5.1)
+  isRecurring       Boolean         @default(false) // temuan berulang (§5.4)
   photoPath         String? // /uploads/...
   status            FindingStatus   @default(DRAFT)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
   capa Capa?
+  redTags RedTag[]
+
+  // Pre-audit verification links (§5.4):
+  reviewsAsPrev   FindingReview[] @relation("PrevReview")   // reviews of THIS finding next month
+  reviewAsCarried FindingReview?  @relation("CarriedReview") // the review that carried this finding in
 
   @@index([auditId])
   @@index([status])
 }
 
+// Pre-audit verification (§5.4): before recording new findings the auditor
+// reviews the AREA's previous-period findings and marks each as still present
+// (carried into this audit as a recurring finding) or already handled.
+model FindingReview {
+  id               String   @id @default(cuid())
+  audit            Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  auditId          String // the current (reviewing) audit
+  prevFinding      Finding  @relation("PrevReview", fields: [prevFindingId], references: [id], onDelete: Cascade)
+  prevFindingId    String // a finding from the same area, previous period
+  stillExists      Boolean // true = masih ada (berulang), false = sudah ditangani
+  // When still present, the recurring finding created in the current audit.
+  carriedFinding   Finding? @relation("CarriedReview", fields: [carriedFindingId], references: [id], onDelete: SetNull)
+  carriedFindingId String?  @unique
+  createdAt        DateTime @default(now())
+
+  @@unique([auditId, prevFindingId])
+  @@index([auditId])
+}
+
 // Corrective & Preventive Action — one per finding. No dispute step (rule 3),
-// single after-photo (rule 4).
+// single after-photo (rule 4). The auditee fills the plan; the CLOSING STATUS
+// is set by Komite Unit during verification (drives the score), not by the
+// auditee. `status` is null until verified; once verified the CAPA is locked.
 model Capa {
-  id               String     @id @default(cuid())
-  finding          Finding    @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  findingId        String     @unique
+  id               String      @id @default(cuid())
+  finding          Finding     @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  findingId        String      @unique
   rootCause        String
   correctiveAction String
   preventiveAction String
+  woScPoNumber     String? // wajib untuk status Progress (§5.2/§5.3)
   afterPhoto       String? // /uploads/... (single photo)
   dueDate          DateTime?
-  status           CapaStatus @default(PROGRESS)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  status           CapaStatus? // null = menunggu verifikasi Komite Unit
+  verifiedAt       DateTime?
+  verifiedBy       String? // denormalized Komite Unit name
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 }
 
 // ===== Daily Checklist — COMPLETELY SEPARATE from Audit (rule 6) =====
@@ -249,12 +303,47 @@ model ChecklistResponse {
   @@unique([runId, itemId])
 }
 
+// ===== Module 7: Document repository =====
+// Versioned 5R reference docs. fileUrl may be an uploaded file (/uploads/..)
+// or an external link; uploadedBy is denormalized (mock auth, no FK).
+model Document {
+  id          String      @id @default(cuid())
+  title       String
+  category    DocCategory
+  version     String      @default("v1.0")
+  fileUrl     String? // /uploads/.. or external URL
+  description String?
+  uploadedBy  String? // denormalized uploader name
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([category])
+}
+
+// ===== Module 7: Audit log =====
+// Append-only record of notable actions. User identity is denormalized so the
+// log survives user edits/deletions.
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String // machine key, e.g. "user.role.update"
+  entity    String // "User" | "AuditSchedule" | "Document" | ...
+  summary   String // human-readable (Bahasa)
+  userName  String
+  userEmail String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // ===== Red Tag =====
 model RedTag {
   id           String         @id @default(cuid())
   tagNumber    String         @unique // RT-YYYY-NNN
   area         Area           @relation(fields: [areaId], references: [id])
   areaId       String
+  // Optional link to the audit finding/CAPA that triggered this red tag.
+  finding      Finding?       @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  findingId    String?
   name         String
   category     String
   reason       String
@@ -268,4 +357,5 @@ model RedTag {
   updatedAt    DateTime       @updatedAt
 
   @@index([status])
+  @@index([findingId])
 }

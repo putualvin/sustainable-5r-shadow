@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { calculate5RScore, gradeFor } from "@/lib/scoring";
+import {
+  calculate5RScore,
+  calculateFinalScore,
+  calculateAuditorScore,
+  gradeFor,
+} from "@/lib/scoring";
 
 describe("calculate5RScore", () => {
   // The canonical worked example from CLAUDE.md — non-negotiable.
@@ -38,6 +43,86 @@ describe("calculate5RScore", () => {
     expect(r.donePct).toBeCloseTo(80.95, 1);
     expect(r.progressPct).toBeCloseTo(14.29, 1);
     expect(r.noProgressPct).toBeCloseTo(4.76, 1);
+  });
+});
+
+describe("calculateFinalScore (Score Akhir — Lapis 2)", () => {
+  // Baseline validasi April 2026 (CLAUDE.md §5.4): 21 temuan semua Done,
+  // dikurangi hanya oleh Temuan Berulang.
+  it("0 temuan berulang -> 100.0", () => {
+    const r = calculateFinalScore({ done: 21, progress: 0, noProgress: 0, recurring: 0 });
+    expect(r.nilaiUtama).toBe(100);
+    expect(r.scoreAkhir).toBe(100);
+  });
+
+  it("1 temuan berulang -> 99.0", () => {
+    expect(
+      calculateFinalScore({ done: 21, progress: 0, noProgress: 0, recurring: 1 }).scoreAkhir
+    ).toBe(99);
+  });
+
+  it("5 temuan berulang -> 95.0", () => {
+    expect(
+      calculateFinalScore({ done: 21, progress: 0, noProgress: 0, recurring: 5 }).scoreAkhir
+    ).toBe(95);
+  });
+
+  it("Parking Lot dilacak (jumlah Not Done) tapi tidak mengurangi skor", () => {
+    const r = calculateFinalScore({ done: 17, progress: 3, noProgress: 1, recurring: 0 });
+    expect(r.parkingLot).toBe(4); // 3 Progress + 1 No Progress
+    expect(r.nilaiUtama).toBe(86);
+    expect(r.scoreAkhir).toBe(86); // Parking Lot weight 0
+  });
+
+  it("Score Akhir tidak pernah negatif", () => {
+    expect(
+      calculateFinalScore({ done: 0, progress: 0, noProgress: 5, recurring: 3 }).scoreAkhir
+    ).toBe(0);
+  });
+});
+
+describe("calculateAuditorScore (§5.5 — 4 komponen @25%)", () => {
+  it("perfect audit -> 100 (on-time, target tercapai, semua High, lintas area)", () => {
+    const r = calculateAuditorScore({
+      onTime: true,
+      findingsCount: 21,
+      low: 0,
+      high: 21,
+      isOwnArea: false,
+    });
+    expect(r).toEqual({
+      timeliness: 100,
+      achievement: 100,
+      quality: 100,
+      independence: 100,
+      total: 100,
+    });
+  });
+
+  it("each component is 25% of the total", () => {
+    // telat, target tercapai, semua Low (quality 50), lintas area
+    const r = calculateAuditorScore({
+      onTime: false,
+      findingsCount: 21,
+      low: 21,
+      high: 0,
+      isOwnArea: false,
+    });
+    // (0 + 100 + 50 + 100) / 4 = 62.5 -> 63
+    expect(r.timeliness).toBe(0);
+    expect(r.achievement).toBe(100);
+    expect(r.quality).toBe(50);
+    expect(r.independence).toBe(100);
+    expect(r.total).toBe(63);
+  });
+
+  it("auditing your own area zeroes independence", () => {
+    expect(calculateAuditorScore({ onTime: true, findingsCount: 21, low: 0, high: 21, isOwnArea: true }).independence).toBe(0);
+  });
+
+  it("achievement scales with findings vs target and caps at 100", () => {
+    expect(calculateAuditorScore({ onTime: true, findingsCount: 0, low: 0, high: 0, isOwnArea: false }).achievement).toBe(0);
+    expect(calculateAuditorScore({ onTime: true, findingsCount: 30, low: 15, high: 15, isOwnArea: false }).achievement).toBe(100);
   });
 });
 

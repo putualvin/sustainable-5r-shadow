@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { emailToRole, canAccess, sectionForPath } from "@/lib/rbac";
+import type { Role } from "@prisma/client";
+import { emailToRoles, canAccess, sectionForPath } from "@/lib/rbac";
 
 const COOKIE_NAME = "session_email";
+const ROLES_COOKIE = "session_roles";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const email = request.cookies.get(COOKIE_NAME)?.value;
-  const role = email ? emailToRole(email) : null;
-  const loggedIn = Boolean(role);
+  const rolesRaw = request.cookies.get(ROLES_COOKIE)?.value;
+
+  // Roles come from the cookie set at login (so the edge can authorise without
+  // a DB call); fall back to the email prefix for older/virtual sessions.
+  const roles: Role[] = rolesRaw
+    ? (rolesRaw.split(",").filter(Boolean) as Role[])
+    : email
+      ? emailToRoles(email)
+      : [];
+  const loggedIn = roles.length > 0;
 
   const isLogin = pathname === "/login";
 
@@ -22,9 +32,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // Route guard by section (403 when role lacks access).
+  // Route guard by section (403 when no role grants access).
   const section = sectionForPath(pathname);
-  if (section && role && !canAccess(role, section)) {
+  if (section && !canAccess(roles, section)) {
     return NextResponse.redirect(new URL("/403", request.url));
   }
 

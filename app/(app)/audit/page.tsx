@@ -12,7 +12,7 @@ export default async function AuditListPage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const isAuditor = user.role === "auditor";
+  const isAuditor = user.roles.includes("auditor");
   const scope = isAuditor ? { auditorId: user.id } : {};
 
   const [schedules, audits] = await Promise.all([
@@ -38,7 +38,7 @@ export default async function AuditListPage() {
   const pending = schedules.filter((s) => !startedScheduleIds.has(s.id));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Audit 5R</h1>
         <p className="text-sm text-muted-foreground">
@@ -97,7 +97,7 @@ export default async function AuditListPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{a.area.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatPeriod(a.period)} · {a._count.findings} temuan
+                        {formatPeriod(a.period)} · {a._count.findings}/21 temuan
                         {!isAuditor ? ` · ${a.auditor.name}` : ""}
                       </p>
                     </div>
