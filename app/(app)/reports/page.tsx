@@ -85,7 +85,7 @@ export default async function ReportsPage() {
   const belowThreshold = scores.filter((s) => s.finalScore < THRESHOLD);
 
   return (
-    <div className="max-w-screen-2xl space-y-5">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Sustainable 5R — Dashboard Laporan</h1>
