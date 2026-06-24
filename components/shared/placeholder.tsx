@@ -9,7 +9,7 @@ export function Placeholder({
   description?: string;
 }) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-4xl">
       <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
       <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-card/50 p-12 text-center">
         <Construction className="h-10 w-10 text-muted-foreground" />

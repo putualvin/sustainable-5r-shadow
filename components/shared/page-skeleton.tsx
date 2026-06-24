@@ -2,7 +2,7 @@
 // loading.tsx). Mirrors the common header + KPI row + content card layout.
 export function PageSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl animate-pulse space-y-6" aria-hidden>
+    <div className="max-w-6xl animate-pulse space-y-6" aria-hidden>
       <div className="space-y-2">
         <div className="h-7 w-48 rounded bg-muted" />
         <div className="h-4 w-64 rounded bg-muted/70" />
