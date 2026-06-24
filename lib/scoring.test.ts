@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { calculate5RScore, calculateFinalScore, gradeFor } from "@/lib/scoring";
+import {
+  calculate5RScore,
+  calculateFinalScore,
+  calculateAuditorScore,
+  gradeFor,
+} from "@/lib/scoring";
 
 describe("calculate5RScore", () => {
   // The canonical worked example from CLAUDE.md — non-negotiable.
@@ -73,6 +78,51 @@ describe("calculateFinalScore (Score Akhir — Lapis 2)", () => {
     expect(
       calculateFinalScore({ done: 0, progress: 0, noProgress: 5, recurring: 3 }).scoreAkhir
     ).toBe(0);
+  });
+});
+
+describe("calculateAuditorScore (§5.5 — 4 komponen @25%)", () => {
+  it("perfect audit -> 100 (on-time, target tercapai, semua High, lintas area)", () => {
+    const r = calculateAuditorScore({
+      onTime: true,
+      findingsCount: 21,
+      low: 0,
+      high: 21,
+      isOwnArea: false,
+    });
+    expect(r).toEqual({
+      timeliness: 100,
+      achievement: 100,
+      quality: 100,
+      independence: 100,
+      total: 100,
+    });
+  });
+
+  it("each component is 25% of the total", () => {
+    // telat, target tercapai, semua Low (quality 50), lintas area
+    const r = calculateAuditorScore({
+      onTime: false,
+      findingsCount: 21,
+      low: 21,
+      high: 0,
+      isOwnArea: false,
+    });
+    // (0 + 100 + 50 + 100) / 4 = 62.5 -> 63
+    expect(r.timeliness).toBe(0);
+    expect(r.achievement).toBe(100);
+    expect(r.quality).toBe(50);
+    expect(r.independence).toBe(100);
+    expect(r.total).toBe(63);
+  });
+
+  it("auditing your own area zeroes independence", () => {
+    expect(calculateAuditorScore({ onTime: true, findingsCount: 21, low: 0, high: 21, isOwnArea: true }).independence).toBe(0);
+  });
+
+  it("achievement scales with findings vs target and caps at 100", () => {
+    expect(calculateAuditorScore({ onTime: true, findingsCount: 0, low: 0, high: 0, isOwnArea: false }).achievement).toBe(0);
+    expect(calculateAuditorScore({ onTime: true, findingsCount: 30, low: 15, high: 15, isOwnArea: false }).achievement).toBe(100);
   });
 });
 

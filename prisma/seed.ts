@@ -299,7 +299,8 @@ async function main() {
         auditorId: auditor1.id,
         period,
         status: "SUBMITTED",
-        submittedAt: new Date(),
+        // Dikirim tgl 8 (≤ tgl 10) → on-time untuk demo Skor Auditor (§5.5).
+        submittedAt: new Date(`${period}-08T09:00:00`),
       },
     });
     const findingSeeds = [
@@ -373,6 +374,11 @@ async function main() {
         });
       }
     }
+    // Keep the REF-2 audit on-time (≤ tgl 10) for the Skor Auditor demo.
+    await db.audit.updateMany({
+      where: { areaId: ref2.id, period, status: "SUBMITTED" },
+      data: { submittedAt: new Date(`${period}-08T09:00:00`) },
+    });
   }
 
   // Daily Checklist items (24) — seed once.

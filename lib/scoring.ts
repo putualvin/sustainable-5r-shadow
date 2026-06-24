@@ -116,3 +116,39 @@ export function calculateFinalScore(input: FinalScoreInput): FinalScore {
   );
   return { nilaiUtama, temuanBerulang, parkingLot, scoreAkhir };
 }
+
+// ===== Scoring Auditor (§5.5) — 4 komponen @25% =====
+export const FINDING_TARGET = 21;
+
+export type AuditorScoreInput = {
+  onTime: boolean; // audit dikirim ≤ tgl 10
+  findingsCount: number;
+  low: number; // jumlah temuan kategori Low
+  high: number; // jumlah temuan kategori High
+  isOwnArea: boolean; // auditor adalah PIC area yang diaudit (konflik)
+  target?: number;
+};
+
+export type AuditorScore = {
+  timeliness: number; // ketepatan waktu (0/100)
+  achievement: number; // pencapaian target temuan (0..100)
+  quality: number; // kualitas temuan (Low=1, High=2 → 0..100)
+  independence: number; // bukan auditor area (0/100)
+  total: number; // rata-rata 4 komponen (integer)
+};
+
+export function calculateAuditorScore(i: AuditorScoreInput): AuditorScore {
+  const target = i.target ?? FINDING_TARGET;
+  const timeliness = i.onTime ? 100 : 0;
+  const achievement =
+    target > 0 ? Math.min(100, Math.round((i.findingsCount / target) * 100)) : 0;
+  const counted = i.low + i.high;
+  // Low=1, High=2; maksimum per temuan = 2 → kualitas 100% bila semua High.
+  const quality =
+    counted > 0 ? Math.round(((i.low + i.high * 2) / (counted * 2)) * 100) : 0;
+  const independence = i.isOwnArea ? 0 : 100;
+  const total = Math.round(
+    (timeliness + achievement + quality + independence) / 4
+  );
+  return { timeliness, achievement, quality, independence, total };
+}
