@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccess } from "@/lib/rbac";
-import { savePhoto } from "@/lib/upload";
+import { photoDataUrl } from "@/lib/upload";
 import { logAction } from "@/lib/audit-log";
 import { findingSchema } from "@/lib/schemas/finding";
 
@@ -68,8 +68,7 @@ export async function addFinding(
   if (audit.status !== "DRAFT")
     return { error: "Audit sudah dikirim dan tidak bisa diubah." };
 
-  const photo = formData.get("photo");
-  const photoPath = photo instanceof File ? await savePhoto(photo) : null;
+  const photoPath = photoDataUrl(formData.get("photo"));
 
   await db.finding.create({
     data: {

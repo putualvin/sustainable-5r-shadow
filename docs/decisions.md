@@ -303,3 +303,23 @@ Format:
 - **Follow-up limit 25/area/month:** `fillCapa` blocks creating a NEW CAPA once the area already has 25 CAPAs for the period (editing existing is always allowed).
 - **Cut-off 17.00 WIB:** `fillCapa` rejects after 17:00 Asia/Jakarta (deploy runs UTC, so hour is derived in WIB). Note: a demo run after 17:00 WIB will see the auditee fill blocked — by design.
 - Seed: REF-2 CAPA #1 has WO-2026-0456 (Komite can set Progress); CAPA #2 has none (Progress blocked until filled).
+
+---
+
+## 2026-06-16 — Photo upload: data URLs instead of filesystem (serverless fix)
+
+**Context:** Uploading a photo always errored on the deploy. Root cause: the
+Vercel filesystem is read-only, so `writeFile` to `public/uploads/` throws
+`EROFS`, which failed the whole server action (add finding / fill CAPA /
+register red tag / checklist).
+
+**Decision:** No filesystem writes. `PhotoInput` resizes the chosen image
+client-side (canvas, max edge 1280px, JPEG q0.72) into a `data:image/...`
+URL and submits it as a hidden text field. The server (`photoDataUrl`)
+validates it and stores the string in the existing photo columns; pages render
+it directly via `<img src=…>`. Document uploads convert to a data URL too
+(`saveDocumentFile`, no FS), with a 4 MB cap (prefer an external URL for big
+files). Server Action body limit already raised to 12 MB.
+
+**Consequences:** Works on serverless and locally; images persist in the DB.
+Resized payloads are small (~100–500 KB). Caps guard against row bloat.

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccess } from "@/lib/rbac";
-import { savePhoto } from "@/lib/upload";
+import { photoDataUrl } from "@/lib/upload";
 
 function todayStr(): string {
   const d = new Date();
@@ -45,9 +45,7 @@ export async function submitChecklist(formData: FormData): Promise<void> {
     const compliant = formData.get(`compliant_${item.id}`) !== "no"; // default Sesuai
     if (compliant) compliantCount++;
     const note = String(formData.get(`note_${item.id}`) ?? "").trim() || null;
-    const photo = formData.get(`photo_${item.id}`);
-    const photoPath =
-      !compliant && photo instanceof File ? await savePhoto(photo) : null;
+    const photoPath = !compliant ? photoDataUrl(formData.get(`photo_${item.id}`)) : null;
     responses.push({ itemId: item.id, compliant, note, photoPath });
   }
 

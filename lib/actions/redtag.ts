@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccess } from "@/lib/rbac";
-import { savePhoto } from "@/lib/upload";
+import { photoDataUrl } from "@/lib/upload";
 import { RETENTION_DAYS } from "@/lib/redtag";
 import { redTagSchema, redTagDecisionSchema } from "@/lib/schemas/redtag";
 
@@ -60,8 +60,7 @@ export async function createRedTag(
     registeredAt.getTime() + RETENTION_DAYS[parsed.data.location] * DAY
   );
 
-  const photo = formData.get("photo");
-  const photoPath = photo instanceof File ? await savePhoto(photo) : null;
+  const photoPath = photoDataUrl(formData.get("photo"));
 
   await db.redTag.create({
     data: {

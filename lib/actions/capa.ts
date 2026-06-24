@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccess, hasAnyRole } from "@/lib/rbac";
-import { savePhoto } from "@/lib/upload";
+import { photoDataUrl } from "@/lib/upload";
 import { calculateFinalScore } from "@/lib/scoring";
 import { logAction } from "@/lib/audit-log";
 import { capaSchema, verifyCapaSchema } from "@/lib/schemas/capa";
@@ -131,8 +131,7 @@ export async function fillCapa(
     }
   }
 
-  const photo = formData.get("afterPhoto");
-  const afterPhoto = photo instanceof File ? await savePhoto(photo) : null;
+  const afterPhoto = photoDataUrl(formData.get("afterPhoto"));
   const dueDate = parsed.data.dueDate ? new Date(parsed.data.dueDate) : null;
   const woScPoNumber = parsed.data.woScPoNumber?.trim() || null;
 
