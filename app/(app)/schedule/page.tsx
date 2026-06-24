@@ -12,6 +12,12 @@ function currentPeriod(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
+function periodPlus(n: number): string {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
 const STATUS = {
   none: { label: "Belum mulai", cls: "bg-muted text-muted-foreground" },
@@ -29,20 +35,23 @@ export default async function SchedulePage({
 
   const canManage = user.roles.includes("komite_unit") || user.roles.includes("admin");
 
-  // Periods that have schedules, plus the current month so a fresh period can
-  // always be generated.
+  // Periods that have schedules, plus the current + upcoming months so a fresh
+  // period can always be selected & generated.
   const periodRows = await db.auditSchedule.findMany({
     distinct: ["period"],
     select: { period: true },
     orderBy: { period: "desc" },
   });
+  const existing = periodRows.map((p) => p.period);
+  const cur = currentPeriod();
   const periods = Array.from(
-    new Set([currentPeriod(), ...periodRows.map((p) => p.period)])
+    new Set([...existing, cur, periodPlus(1), periodPlus(2)])
   ).sort((a, b) => b.localeCompare(a));
+  const defaultPeriod = existing.includes(cur) ? cur : existing[0] ?? cur;
   const period =
     searchParams.period && periods.includes(searchParams.period)
       ? searchParams.period
-      : periods[0];
+      : defaultPeriod;
 
   const [schedules, audits] = await Promise.all([
     db.auditSchedule.findMany({
@@ -71,14 +80,14 @@ export default async function SchedulePage({
         </div>
         {canManage && (
           <div className="flex gap-2 print:hidden">
-            {schedules.length === 0 ? (
-              <form action={generateSchedule}>
-                <input type="hidden" name="period" value={period} />
-                <Button size="sm" className="gap-2">
-                  <Sparkles className="h-4 w-4" /> Buat Jadwal
-                </Button>
-              </form>
-            ) : (
+            <form action={generateSchedule}>
+              <input type="hidden" name="period" value={period} />
+              <Button size="sm" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                {schedules.length === 0 ? "Buat Jadwal" : "Perbarui Jadwal"}
+              </Button>
+            </form>
+            {schedules.length > 0 && (
               <form action={shuffleSchedule}>
                 <input type="hidden" name="period" value={period} />
                 <Button size="sm" variant="outline" className="gap-2">

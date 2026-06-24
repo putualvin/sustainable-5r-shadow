@@ -36,13 +36,23 @@ export async function generateSchedule(formData: FormData): Promise<void> {
   const period = String(formData.get("period") ?? "");
   if (!/^\d{4}-\d{2}$/.test(period)) redirect("/schedule");
 
-  const [areas, auditors] = await Promise.all([
+  const [areas, auditors, existing] = await Promise.all([
     db.area.findMany({ where: { active: true }, orderBy: { code: "asc" } }),
     activeAuditors(),
+    db.auditSchedule.findMany({
+      where: { period },
+      select: { areaId: true, _count: { select: { audits: true } } },
+    }),
   ]);
   if (auditors.length === 0) redirect("/schedule?error=no-auditors");
 
+  // Safe to re-run: keep areas whose audit has already started.
+  const startedAreaIds = new Set(
+    existing.filter((s) => s._count.audits > 0).map((s) => s.areaId)
+  );
+
   for (let i = 0; i < areas.length; i++) {
+    if (startedAreaIds.has(areas[i].id)) continue;
     let pick = auditors[i % auditors.length];
     // No self-audit: if the rotation lands on this area's own PIC, pick another.
     if (pick.areaId === areas[i].id) {
