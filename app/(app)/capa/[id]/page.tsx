@@ -99,6 +99,9 @@ export default async function CapaDetailPage({
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-foreground/90 px-2 py-0.5 text-xs font-bold text-background tabular-nums">
+              Temuan #{finding.number}
+            </span>
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
               {PILLAR_LABEL[finding.guidingQuestion.pillar]}
             </span>

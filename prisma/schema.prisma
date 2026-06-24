@@ -194,6 +194,7 @@ model Finding {
   id                String          @id @default(cuid())
   audit             Audit           @relation(fields: [auditId], references: [id], onDelete: Cascade)
   auditId           String
+  number            Int             @default(0) // nomor temuan urut per audit (area+periode)
   guidingQuestion   GuidingQuestion @relation(fields: [guidingQuestionId], references: [id])
   guidingQuestionId String
   locationDetail    String? // specific spot within the area

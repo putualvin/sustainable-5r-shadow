@@ -12,6 +12,8 @@ const ERRORS: Record<string, string> = {
   "self-demote": "Anda tidak dapat menurunkan peran admin Anda sendiri.",
   "self-deactivate": "Anda tidak dapat menonaktifkan akun Anda sendiri.",
   role: "Peran tidak valid.",
+  "komite-solo":
+    "Komite Unit bersifat independen — peran ini tidak boleh digabung dengan peran lain.",
 };
 
 export default async function AdminPage({

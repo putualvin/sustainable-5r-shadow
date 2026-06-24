@@ -142,6 +142,7 @@ function PendingBadge() {
 
 type RowFinding = {
   id: string;
+  number: number;
   description: string;
   guidingQuestion: { pillar: Pillar; subCategory: string };
   audit: { area: { name: string } };
@@ -153,6 +154,9 @@ function Row({ f, badge }: { f: RowFinding; badge?: React.ReactNode }) {
       <Link href={`/capa/${f.id}`} className="flex items-center gap-3 p-4 hover:bg-muted/40">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-foreground/90 px-2 py-0.5 text-xs font-bold text-background tabular-nums">
+              #{f.number}
+            </span>
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
               {PILLAR_LABEL[f.guidingQuestion.pillar]}
             </span>

@@ -41,6 +41,15 @@ export async function startAuditFromSchedule(formData: FormData): Promise<void> 
   redirect(`/audit/${audit.id}`);
 }
 
+// Next sequential finding number within an audit (area+period): 1, 2, 3, …
+async function nextFindingNumber(auditId: string): Promise<number> {
+  const agg = await db.finding.aggregate({
+    where: { auditId },
+    _max: { number: true },
+  });
+  return (agg._max.number ?? 0) + 1;
+}
+
 export type FindingActionState = { ok?: boolean; error?: string };
 
 // Add a finding to a draft audit (with optional camera/gallery photo).
@@ -73,6 +82,7 @@ export async function addFinding(
   await db.finding.create({
     data: {
       auditId: parsed.data.auditId,
+      number: await nextFindingNumber(parsed.data.auditId),
       guidingQuestionId: parsed.data.guidingQuestionId,
       locationDetail: parsed.data.locationDetail ?? null,
       description: parsed.data.description,
@@ -136,6 +146,7 @@ export async function reviewPreviousFinding(formData: FormData): Promise<void> {
     const carried = await db.finding.create({
       data: {
         auditId,
+        number: await nextFindingNumber(auditId),
         guidingQuestionId: prev.guidingQuestionId,
         locationDetail: prev.locationDetail,
         description: prev.description,

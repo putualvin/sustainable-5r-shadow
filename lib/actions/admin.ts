@@ -31,6 +31,13 @@ export async function setUserRoles(formData: FormData): Promise<void> {
     .filter((r): r is Role => ROLES.includes(r as Role));
   if (roles.length === 0) redirect("/admin?error=role");
 
+  // Komite Unit is independent: an assessor sits outside the area, so the role
+  // may NOT be combined with any other (unlike Auditor + Auditee, which one
+  // area person can hold together).
+  if (roles.includes("komite_unit") && roles.length > 1) {
+    redirect("/admin?error=komite-solo");
+  }
+
   // Guard against an admin removing their own admin role (lockout safety).
   if (userId === actor.id && !roles.includes("admin")) {
     redirect("/admin?error=self-demote");

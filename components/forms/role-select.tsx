@@ -20,6 +20,27 @@ export function RolesSelect({
   disabled?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Komite Unit is independent — it cannot be combined with any other role.
+  // Enforce mutual exclusivity in the UI before submitting (server re-checks).
+  function handleChange(changed: Role) {
+    const form = formRef.current;
+    if (!form) return;
+    const boxes = Array.from(
+      form.querySelectorAll<HTMLInputElement>('input[name="roles"]')
+    );
+    const find = (r: Role) => boxes.find((b) => b.value === r);
+    const komite = find("komite_unit");
+    if (changed === "komite_unit" && komite?.checked) {
+      boxes.forEach((b) => {
+        if (b.value !== "komite_unit") b.checked = false;
+      });
+    } else if (changed !== "komite_unit" && find(changed)?.checked && komite) {
+      komite.checked = false;
+    }
+    form.requestSubmit();
+  }
+
   return (
     <form ref={formRef} action={setUserRoles} className="flex flex-wrap gap-1.5">
       <input type="hidden" name="userId" value={userId} />
@@ -41,7 +62,7 @@ export function RolesSelect({
               defaultChecked={checked}
               disabled={disabled}
               className="sr-only"
-              onChange={() => formRef.current?.requestSubmit()}
+              onChange={() => handleChange(r)}
             />
             {ROLE_LABELS[r]}
           </label>

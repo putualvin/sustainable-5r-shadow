@@ -499,6 +499,28 @@ async function main() {
     }
   }
 
+  // Backfill (idempotent): assign sequential per-audit finding numbers to any
+  // findings created without one (number == 0). Once numbered they are skipped.
+  const auditsToNumber = await db.finding.findMany({
+    where: { number: 0 },
+    select: { auditId: true },
+    distinct: ["auditId"],
+  });
+  for (const { auditId } of auditsToNumber) {
+    const fs = await db.finding.findMany({
+      where: { auditId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, number: true },
+    });
+    let n = fs.reduce((m, f) => Math.max(m, f.number), 0);
+    for (const f of fs) {
+      if (f.number === 0) {
+        n += 1;
+        await db.finding.update({ where: { id: f.id }, data: { number: n } });
+      }
+    }
+  }
+
   // Reference documents (Module 7) — seed once.
   if ((await db.document.count()) === 0) {
     for (const d of DOCUMENTS) {
