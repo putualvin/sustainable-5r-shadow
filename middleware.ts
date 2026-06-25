@@ -41,7 +41,11 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Run on all routes except static assets, API, and the 403 page itself.
+// Run on all routes except static assets, API, the 403 page, and the PWA entry
+// points (service worker, manifest, icons, offline fallback) — these must be
+// reachable without a session so install + offline work before/without login.
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|403).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|403|offline|sw\\.js|manifest\\.webmanifest|.*\\.png).*)",
+  ],
 };
