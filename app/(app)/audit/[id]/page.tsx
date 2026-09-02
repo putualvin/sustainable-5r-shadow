@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import {
   ChevronLeft,
@@ -30,6 +31,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AddFindingForm } from "@/components/forms/add-finding-form";
 import { CapaStatusBadge } from "@/components/shared/capa-status-badge";
+import { appConfig } from "@/lib/app-config";
+import { ensureDemoPreviousFindings } from "@/lib/demo-previous-findings";
 
 export default async function AuditDetailPage(
   props: {
@@ -71,6 +74,14 @@ export default async function AuditDetailPage(
 
   // §5.4 — before recording new findings, the auditor verifies the area's
   // previous-period findings (still present → recurring, or already handled).
+  if (appConfig.isDemo) {
+    await ensureDemoPreviousFindings({
+      areaId: audit.areaId,
+      currentPeriod: audit.period,
+      currentAuditorId: audit.auditorId,
+    });
+  }
+
   const lastPeriod = prevPeriod(audit.period);
   const prevFindings = await db.finding.findMany({
     where: {
@@ -237,6 +248,17 @@ export default async function AuditDetailPage(
                         Lokasi: {f.locationDetail}
                       </p>
                     )}
+                    {f.photoPath && (
+                      <Image
+                        src={f.photoPath}
+                        alt={`Foto bukti: ${f.description}`}
+                        width={640}
+                        height={420}
+                        sizes="(min-width: 640px) 256px, 100vw"
+                        unoptimized={f.photoPath.startsWith("data:")}
+                        className="mt-3 h-40 w-full rounded-lg border object-cover sm:w-64"
+                      />
+                    )}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {f.capa?.status ? (
                         <CapaStatusBadge status={f.capa.status} />
@@ -380,10 +402,13 @@ export default async function AuditDetailPage(
               <Card key={f.id} id={`finding-${f.id}`}>
                 <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
                   {f.photoPath ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={f.photoPath}
-                      alt="Foto temuan"
+                      alt={`Foto temuan: ${f.description}`}
+                      width={80}
+                      height={80}
+                      sizes="80px"
+                      unoptimized={f.photoPath.startsWith("data:")}
                       className="h-20 w-20 shrink-0 rounded-md border object-cover"
                     />
                   ) : (

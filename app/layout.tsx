@@ -2,9 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import { appConfig } from "@/lib/app-config";
 import { PwaRegister } from "@/components/shared/pwa-register";
-import { DemoBanner } from "@/components/shared/demo-banner";
 
 // Light "High-Performance Precision" type system: Hanken Grotesk across the UI,
 // JetBrains Mono for technical labels/data.
@@ -56,7 +54,6 @@ export default function RootLayout({
           "min-h-dvh font-sans antialiased"
         )}
       >
-        {appConfig.isDemo && <DemoBanner />}
         {children}
         <PwaRegister />
       </body>

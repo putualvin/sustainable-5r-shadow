@@ -358,9 +358,9 @@ async function main() {
       },
     });
     const prevSeeds = [
-      { gq: pick("Lantai"), location: "Stasiun kerja B", description: "Sisa material simulasi belum dibersihkan tuntas.", kategori: "HIGH" as const },
-      { gq: pick("Garis Demarkasi"), location: "Jalur pejalan kaki", description: "Garis demarkasi jalur pejalan kaki mulai pudar.", kategori: "LOW" as const },
-      { gq: pick("Material dan atau Suku cadang"), location: "Rak karantina", description: "Barang nonaktif masih tersimpan pada rak aktif.", kategori: "LOW" as const },
+      { gq: pick("Lantai"), location: "Koridor utilitas", description: "Masih terdapat ceceran pelumas kecil di dekat troli kerja dan jalur pejalan kaki.", kategori: "HIGH" as const, photoPath: "/demo/findings/lubricant-spill.webp" },
+      { gq: pick("Garis Demarkasi"), location: "Jalur gudang", description: "Garis batas jalur pejalan kaki mulai pudar dan perlu dicat ulang.", kategori: "LOW" as const, photoPath: "/demo/findings/faded-floor-marking.webp" },
+      { gq: pick("Material dan atau Suku cadang"), location: "Sudut area perawatan", description: "Suku cadang tidak aktif masih menumpuk di luar rak penyimpanan.", kategori: "LOW" as const, photoPath: "/demo/findings/cluttered-spare-parts.webp" },
     ];
     const previousStatuses = ["PROGRESS", "DONE", "NO_PROGRESS"] as const;
     for (const [index, f] of prevSeeds.entries()) {
@@ -371,6 +371,7 @@ async function main() {
           locationDetail: f.location,
           description: f.description,
           kategori: f.kategori,
+          photoPath: f.photoPath,
           isRecurring: false,
           status: "PENDING_CAPA",
         },
