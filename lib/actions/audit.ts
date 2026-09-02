@@ -87,9 +87,10 @@ export async function addFinding(
       guidingQuestionId: parsed.data.guidingQuestionId,
       locationDetail: parsed.data.locationDetail ?? null,
       description: parsed.data.description,
-      // Priority is intentionally left empty. Komite Unit assigns it after
-      // the auditor submits the audit.
-      kategori: null,
+      // Legacy demo databases still require a stored enum value. LOW is only
+      // a compatibility placeholder while status is DRAFT; the UI treats the
+      // priority as unassigned until Komite Unit explicitly sets it.
+      kategori: "LOW",
       isRecurring: false,
       photoPath,
     },
@@ -153,9 +154,9 @@ export async function reviewPreviousFinding(formData: FormData): Promise<void> {
         guidingQuestionId: prev.guidingQuestionId,
         locationDetail: prev.locationDetail,
         description: prev.description,
-        // A recurring finding is reviewed again in the current period, so its
-        // current priority is decided by Komite Unit after submission.
-        kategori: null,
+        // Compatibility placeholder for older demo databases where kategori
+        // is still NOT NULL. It is hidden until Komite Unit assigns priority.
+        kategori: prev.kategori ?? "LOW",
         isRecurring: true, // temuan berulang (§5.4)
         photoPath: prev.photoPath,
       },
@@ -289,7 +290,9 @@ export async function submitAudit(formData: FormData): Promise<void> {
     }),
     db.finding.updateMany({
       where: { auditId },
-      data: { status: "PENDING_PRIORITY", kategori: null },
+      // Keep the legacy stored placeholder; PENDING_PRIORITY is the source of
+      // truth that tells the UI and CAPA flow priority is not assigned yet.
+      data: { status: "PENDING_PRIORITY" },
     }),
   ]);
 

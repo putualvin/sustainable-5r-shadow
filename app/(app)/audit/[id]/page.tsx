@@ -104,8 +104,12 @@ export default async function AuditDetailPage(
   const total = audit.findings.length;
   const berulang = audit.findings.filter((f) => f.isRecurring).length;
   const reguler = total - berulang;
-  const countHigh = audit.findings.filter((f) => f.kategori === "HIGH").length;
-  const countLow = audit.findings.filter((f) => f.kategori === "LOW").length;
+  const countHigh = audit.findings.filter(
+    (f) => f.status === "PENDING_CAPA" && f.kategori === "HIGH"
+  ).length;
+  const countLow = audit.findings.filter(
+    (f) => f.status === "PENDING_CAPA" && f.kategori === "LOW"
+  ).length;
   const countUnassigned = total - countHigh - countLow;
   const pct = Math.min(100, Math.round((total / TARGET) * 100));
   const reached = total >= TARGET;
@@ -237,7 +241,9 @@ export default async function AuditDetailPage(
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                         {PILLAR_LABEL[f.guidingQuestion.pillar]}
                       </span>
-                      <PriorityBadge priority={f.kategori} />
+                      <PriorityBadge
+                        priority={f.status === "PENDING_CAPA" ? f.kategori : null}
+                      />
                       <span className="text-sm font-medium">
                         {f.guidingQuestion.subCategory}
                       </span>
@@ -425,7 +431,9 @@ export default async function AuditDetailPage(
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                         {PILLAR_LABEL[f.guidingQuestion.pillar]}
                       </span>
-                      <PriorityBadge priority={f.kategori} />
+                      <PriorityBadge
+                        priority={f.status === "PENDING_CAPA" ? f.kategori : null}
+                      />
                       {f.isRecurring && (
                         <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
                           Berulang
@@ -483,10 +491,15 @@ export default async function AuditDetailPage(
                             <Button
                               type="submit"
                               size="sm"
-                              variant={f.kategori === priority ? "default" : "outline"}
+                              variant={
+                                f.status === "PENDING_CAPA" && f.kategori === priority
+                                  ? "default"
+                                  : "outline"
+                              }
                               className={cn(
                                 priority === "HIGH" &&
-                                  f.kategori !== priority &&
+                                  (f.status !== "PENDING_CAPA" ||
+                                    f.kategori !== priority) &&
                                   "border-danger/40 text-danger hover:bg-danger/10"
                               )}
                             >
