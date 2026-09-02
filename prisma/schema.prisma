@@ -36,10 +36,11 @@ enum AuditStatus {
 // Finding lifecycle for Module 2. CAPA closing statuses live in Module 3.
 enum FindingStatus {
   DRAFT
+  PENDING_PRIORITY
   PENDING_CAPA
 }
 
-// Auditor-assigned category of a finding (§5.1). NOT the closing status.
+// Komite Unit-assigned priority of a finding. NOT the CAPA closing status.
 enum Kategori {
   LOW
   HIGH
@@ -135,8 +136,8 @@ model Score {
   @@index([period])
 }
 
-// Official 5R taxonomy (27 sub-categories across the 5 pillars). Used ONLY to
-// classify audit findings — NOT the Daily Checklist (separate model later).
+// Generic 5R taxonomy used to classify audit findings in the public demo.
+// It is separate from the Daily Checklist model below.
 model GuidingQuestion {
   id          String   @id @default(cuid())
   pillar      Pillar
@@ -153,14 +154,14 @@ model GuidingQuestion {
 
 // Who audits which area in a given period (committee-managed).
 model AuditSchedule {
-  id        String   @id @default(cuid())
-  area      Area     @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  area      Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
   areaId    String
-  auditor   User     @relation(fields: [auditorId], references: [id])
+  auditor   User      @relation(fields: [auditorId], references: [id])
   auditorId String
   period    String // "YYYY-MM"
   dueDate   DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   audits Audit[]
 
@@ -170,18 +171,18 @@ model AuditSchedule {
 
 // One audit = one auditor inspecting one area in one period.
 model Audit {
-  id          String        @id @default(cuid())
-  area        Area          @relation(fields: [areaId], references: [id])
+  id          String         @id @default(cuid())
+  area        Area           @relation(fields: [areaId], references: [id])
   areaId      String
-  auditor     User          @relation(fields: [auditorId], references: [id])
+  auditor     User           @relation(fields: [auditorId], references: [id])
   auditorId   String
   schedule    AuditSchedule? @relation(fields: [scheduleId], references: [id])
   scheduleId  String?
   period      String // "YYYY-MM"
-  status      AuditStatus   @default(DRAFT)
+  status      AuditStatus    @default(DRAFT)
   submittedAt DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   findings       Finding[]
   findingReviews FindingReview[]
@@ -199,18 +200,20 @@ model Finding {
   guidingQuestionId String
   locationDetail    String? // specific spot within the area
   description       String
-  kategori          Kategori        @default(LOW) // auditor-assigned (§5.1)
+  // Kept as `kategori` for database compatibility; semantically this is the
+  // finding priority and is assigned by Komite Unit after audit submission.
+  kategori          Kategori?
   isRecurring       Boolean         @default(false) // temuan berulang (§5.4)
   photoPath         String? // /uploads/...
   status            FindingStatus   @default(DRAFT)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
-  capa Capa?
+  capa    Capa?
   redTags RedTag[]
 
   // Pre-audit verification links (§5.4):
-  reviewsAsPrev   FindingReview[] @relation("PrevReview")   // reviews of THIS finding next month
+  reviewsAsPrev   FindingReview[] @relation("PrevReview") // reviews of THIS finding next month
   reviewAsCarried FindingReview?  @relation("CarriedReview") // the review that carried this finding in
 
   @@index([auditId])
@@ -259,7 +262,7 @@ model Capa {
 
 // ===== Daily Checklist — COMPLETELY SEPARATE from Audit (rule 6) =====
 // Self-check done per shift by the area's own PIC. Items are area-specific,
-// scoped to the parent area group (Refinery / Fractionation).
+// scoped to one of two synthetic parent area groups.
 
 model ChecklistItem {
   id        String    @id @default(cuid())
@@ -272,6 +275,7 @@ model ChecklistItem {
   responses ChecklistResponse[]
 
   @@index([group])
+  @@unique([group, order])
 }
 
 model ChecklistRun {

@@ -6,9 +6,9 @@ The principle: **demo-ready as fast as possible**. The first 3 modules should be
 
 Goal: a Next.js app that boots, has the design system in place, and can route between pages.
 
-- [ ] Scaffold Next.js 14 + TypeScript + Tailwind + shadcn/ui
+- [ ] Scaffold Next.js 16 + TypeScript + Tailwind + shadcn/ui
 - [ ] Install deps: prisma, @prisma/client, lucide-react, recharts, qrcode.react, react-hook-form, zod, date-fns, zustand
-- [ ] Configure Tailwind with Sinar Mas color tokens (see CLAUDE.md)
+- [ ] Configure Tailwind with the demo color tokens (see CLAUDE.md)
 - [ ] Set up Prisma with SQLite; create initial schema (User, Area)
 - [ ] Mock auth: login page + middleware + session via cookie
 - [ ] App shell: sidebar (desktop) / bottom nav (mobile) with role-aware menu
@@ -44,7 +44,7 @@ Goal: an auditor can create an audit and add findings.
 - [ ] On submit final: distribute to area's PIC (status → "Pending CAPA")
 - [ ] Toast notification on distribute
 
-**Done when:** auditor1@5r.local can create an audit with several findings + photos and submit it, and pic.refinery2@5r.local sees those findings in their inbox.
+**Done when:** auditor1@5r.local can create an audit with several dummy findings + photos and submit it, and pic.ref-2@5r.local sees those findings in their inbox.
 
 ## Module 3 — CAPA + Auto-scoring (2 sessions)
 
@@ -54,7 +54,7 @@ Goal: complete the audit → CAPA → score loop.
 - [ ] No dispute step — direct from finding to CAPA
 - [ ] Status: Done / Progress / No Progress
 - [ ] On status change, recalc area's score using `lib/scoring.ts`
-- [ ] Score Overview page: 12 area cards in Sinar Mas red, badges (EXCELLENT/GOOD/etc.)
+- [ ] Score Overview page: 12 area cards using the demo primary color, badges (EXCELLENT/GOOD/etc.)
 - [ ] Score Detail page (click a card): full calculation breakdown table, pie + trend charts
 - [ ] Print-ready signature block at bottom of detail page
 
@@ -66,7 +66,7 @@ At this point you have a working demo. Stop, run through the full flow as differ
 
 ## Module 4 — Daily Checklist (1-2 sessions)
 
-- [ ] Checklist items per area (15 realistic items for refinery context)
+- [ ] Checklist items per area (synthetic items for a generic facility)
 - [ ] Daily checklist form: per area per shift (1/2/3), checkbox + optional photo if non-compliant
 - [ ] Daily score calculation; notification if < 90%
 - [ ] History view: monthly calendar coloured by status

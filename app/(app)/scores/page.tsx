@@ -58,7 +58,7 @@ export default async function ScoresPage() {
   >();
   for (const au of auditsForScore) {
     const high = au.findings.filter((f) => f.kategori === "HIGH").length;
-    const low = au.findings.length - high;
+    const low = au.findings.filter((f) => f.kategori === "LOW").length;
     const onTime = au.submittedAt ? new Date(au.submittedAt).getDate() <= 10 : false;
     const sc = calculateAuditorScore({
       onTime,

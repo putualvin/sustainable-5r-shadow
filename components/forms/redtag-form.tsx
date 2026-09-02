@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
 import { createRedTag, type RedTagActionState } from "@/lib/actions/redtag";
 import { CATEGORY_OPTIONS, LOCATION_OPTIONS } from "@/lib/redtag";
@@ -24,7 +25,7 @@ export function RedTagForm({
   defaultAreaId?: string | null;
   findingId?: string;
 }) {
-  const [state, formAction] = useFormState<RedTagActionState, FormData>(
+  const [state, formAction] = useActionState<RedTagActionState, FormData>(
     createRedTag,
     {}
   );

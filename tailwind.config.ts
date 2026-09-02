@@ -53,7 +53,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Status tokens (brand Sinar Mas) — pakai lewat class, jangan hard-code hex.
+        // Status tokens for the public demo — use through semantic classes.
         info: {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",

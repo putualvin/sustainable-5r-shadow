@@ -22,7 +22,6 @@ export async function logAction(entry: {
       },
     });
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error("logAction failed", err);
   }
 }

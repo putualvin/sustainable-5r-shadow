@@ -19,13 +19,27 @@ export function useLocalDraft<T>(
 
   // Restore once on mount (client only).
   useEffect(() => {
+    let cancelled = false;
+    let restoredValue: T | undefined;
+
     try {
       const raw = window.localStorage.getItem(key);
-      if (raw !== null) setValue(JSON.parse(raw) as T);
+      if (raw !== null) restoredValue = JSON.parse(raw) as T;
     } catch {
       // ignore malformed/unavailable storage
     }
-    setRestored(true);
+
+    // Restore after the effect has finished so React does not perform a
+    // synchronous cascading render from inside the effect body.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (restoredValue !== undefined) setValue(restoredValue);
+      setRestored(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [key]);
 
   // Persist on change — but only after the restore pass has completed.

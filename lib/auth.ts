@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { emailToRoles } from "@/lib/rbac";
+import { appConfig } from "@/lib/app-config";
 
 const COOKIE_NAME = "session_email";
 const ROLES_COOKIE = "session_roles";
@@ -20,19 +21,22 @@ const COOKIE_OPTS = {
   sameSite: "lax" as const,
   path: "/",
   maxAge: 60 * 60 * 24 * 7,
+  secure: process.env.NODE_ENV === "production",
 };
 
-// Set the session cookies (Next.js 14: cookies() is synchronous). `roles` is
-// stored so the edge middleware can authorise without a DB call.
-export function createSession(email: string, roles: Role[]): void {
+// Set the session cookies. `roles` is stored so the request proxy can apply a
+// coarse route guard without a database call.
+export async function createSession(email: string, roles: Role[]): Promise<void> {
   const value = email.trim().toLowerCase();
-  cookies().set(COOKIE_NAME, value, COOKIE_OPTS);
-  cookies().set(ROLES_COOKIE, roles.join(","), COOKIE_OPTS);
+  const cookieStore = await cookies();
+  cookieStore.set(COOKIE_NAME, value, COOKIE_OPTS);
+  cookieStore.set(ROLES_COOKIE, roles.join(","), COOKIE_OPTS);
 }
 
-export function destroySession(): void {
-  cookies().delete(COOKIE_NAME);
-  cookies().delete(ROLES_COOKIE);
+export async function destroySession(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAME);
+  cookieStore.delete(ROLES_COOKIE);
 }
 
 function nameFromEmail(email: string): string {
@@ -45,7 +49,11 @@ function nameFromEmail(email: string): string {
 // Resolve the logged-in user. The DB row is authoritative for roles + area;
 // otherwise we fall back to a virtual user derived from the email prefix.
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  const email = cookies().get(COOKIE_NAME)?.value;
+  // Mock authentication is intentionally unavailable outside the public demo.
+  // Pilot/production must replace this with enterprise identity (e.g. Entra ID).
+  if (!appConfig.isDemo) return null;
+
+  const email = (await cookies()).get(COOKIE_NAME)?.value;
   if (!email) return null;
 
   const fallbackRoles = emailToRoles(email);

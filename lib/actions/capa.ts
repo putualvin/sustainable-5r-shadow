@@ -103,6 +103,11 @@ export async function fillCapa(
     },
   });
   if (!finding) return { error: "Temuan tidak ditemukan." };
+  if (!finding.kategori || finding.status !== "PENDING_CAPA") {
+    return {
+      error: "Temuan belum diberi prioritas Low/High oleh Komite Unit.",
+    };
+  }
 
   // Auditee may only fill CAPA for their own area.
   if (user.roles.includes("auditee") && finding.audit.areaId !== user.areaId) {

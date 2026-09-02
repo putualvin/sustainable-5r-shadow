@@ -1,7 +1,7 @@
 import type { Role } from "@prisma/client";
 
 // Mock auth: map an email's leading keyword to a role (shadow build only).
-// Pure + edge-safe (no DB) so it can be used in middleware too.
+// Pure and database-free so it can be used in the request proxy too.
 const PREFIX_ROLE: { prefix: string; role: Role }[] = [
   { prefix: "admin", role: "admin" },
   { prefix: "komite", role: "komite_unit" },
@@ -14,7 +14,7 @@ const PREFIX_ROLE: { prefix: string; role: Role }[] = [
 // Roles derived from an email prefix. Returns a (possibly empty) array — a user
 // can hold multiple roles, but the email prefix only ever implies one. Real
 // users carry their full role set in the DB (User.roles); this is the fallback
-// for virtual/mock users and the edge middleware.
+// for virtual/mock users and the request proxy.
 export function emailToRoles(email: string): Role[] {
   const local = email.trim().toLowerCase().split("@")[0] ?? "";
   for (const { prefix, role } of PREFIX_ROLE) {
@@ -103,7 +103,7 @@ export function navForRoles(roles: Role[]): NavItem[] {
   return NAV_ITEMS.filter((item) => canAccess(roles, item.section));
 }
 
-// Map a section to the roles allowed (used by middleware/route guards).
+// Map a section to the roles allowed (used by proxy/route guards).
 export function rolesForSection(section: Section): Role[] {
   return SECTION_ACCESS[section] ?? [];
 }

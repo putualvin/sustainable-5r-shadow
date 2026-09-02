@@ -74,7 +74,6 @@ async function main() {
       await p.selectOption("#pillar", { index: 1 });
       await p.waitForTimeout(400);
       await p.selectOption("#guidingQuestionId", { index: 1 });
-      await p.selectOption("#kategori", "HIGH");
       await p.fill("#description", FINDING);
       await p.getByRole("button", { name: /Tambah Temuan/ }).click();
       await p.waitForTimeout(2500);
@@ -82,18 +81,34 @@ async function main() {
       await p.reload({ waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1500);
       check("temuan persist setelah reload (DB)", (await p.locator("body").innerText()).includes(FINDING));
-      await p.getByRole("button", { name: /Kirim & Distribusikan/ }).click();
+      await p.getByRole("button", { name: /Kirim ke Komite Unit/ }).click();
       await p.waitForTimeout(2500);
       check("audit terkirim", p.url().includes("submitted=1"));
     }
     await c.close();
   }
 
-  // B) Admin: isi CAPA + verifikasi Done (sinkron audit→CAPA→skor)
+  // B) Admin: tetapkan priority, isi CAPA (admin override), lalu verifikasi Done.
   {
     const c = await ctxFor("admin@5r.local", "admin");
     const p = await c.newPage();
     p.setDefaultTimeout(60000);
+    await go(p, `/capa`);
+    await p.waitForTimeout(1500);
+    const priorityLink = p.locator('a[href^="/audit/"]', { hasText: FINDING }).first();
+    const needsPriority = (await priorityLink.count()) > 0;
+    check("temuan muncul di antrean prioritas Komite", needsPriority);
+    if (needsPriority) {
+      const priorityHref = await priorityLink.getAttribute("href");
+      const findingAnchor = priorityHref?.split("#")[1];
+      await priorityLink.click();
+      await p.waitForTimeout(1500);
+      const findingCard = findingAnchor ? p.locator(`#${findingAnchor}`) : p.locator("body");
+      await findingCard.getByRole("button", { name: "High", exact: true }).click();
+      await p.waitForTimeout(1800);
+      check("prioritas High ditetapkan oleh Komite", (await findingCard.innerText()).includes("High"));
+    }
+
     await go(p, `/capa`);
     await p.waitForTimeout(1500);
     const link = p.locator('a[href^="/capa/"]', { hasText: FINDING }).first();
@@ -113,7 +128,7 @@ async function main() {
       await p.goto(url, { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1500);
       check("data CAPA persist (No. WO tampil)", (await p.locator("body").innerText()).includes(`WO-E2E-${TS}`));
-      await p.getByRole("button", { name: /Selesai \(Done\)/ }).click();
+      await p.getByRole("button", { name: "Done", exact: true }).click();
       await p.waitForTimeout(2500);
       check("CAPA diverifikasi Done (skor dihitung ulang)", p.url().includes("verified=1"));
     }

@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { canAccess } from "@/lib/rbac";
+import { canAccess, hasAnyRole } from "@/lib/rbac";
 import { photoDataUrl } from "@/lib/upload";
 import { logAction } from "@/lib/audit-log";
-import { findingSchema } from "@/lib/schemas/finding";
+import { findingPrioritySchema, findingSchema } from "@/lib/schemas/finding";
 
 // Start an audit from a schedule entry (auditor for that schedule, or komite/admin).
 export async function startAuditFromSchedule(formData: FormData): Promise<void> {
@@ -65,8 +65,6 @@ export async function addFinding(
     guidingQuestionId: formData.get("guidingQuestionId"),
     locationDetail: formData.get("locationDetail") || undefined,
     description: formData.get("description"),
-    kategori: formData.get("kategori"),
-    isRecurring: formData.get("isRecurring") === "on",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
@@ -74,6 +72,9 @@ export async function addFinding(
 
   const audit = await db.audit.findUnique({ where: { id: parsed.data.auditId } });
   if (!audit) return { error: "Audit tidak ditemukan." };
+  if (!user.roles.includes("auditor") || audit.auditorId !== user.id) {
+    return { error: "Anda hanya dapat mengubah audit yang ditugaskan kepada Anda." };
+  }
   if (audit.status !== "DRAFT")
     return { error: "Audit sudah dikirim dan tidak bisa diubah." };
 
@@ -86,8 +87,10 @@ export async function addFinding(
       guidingQuestionId: parsed.data.guidingQuestionId,
       locationDetail: parsed.data.locationDetail ?? null,
       description: parsed.data.description,
-      kategori: parsed.data.kategori,
-      isRecurring: parsed.data.isRecurring ?? false,
+      // Priority is intentionally left empty. Komite Unit assigns it after
+      // the auditor submits the audit.
+      kategori: null,
+      isRecurring: false,
       photoPath,
     },
   });
@@ -110,7 +113,7 @@ export async function reviewPreviousFinding(formData: FormData): Promise<void> {
 
   const audit = await db.audit.findUnique({ where: { id: auditId } });
   if (!audit) redirect("/audit");
-  if (user.roles.includes("auditor") && audit.auditorId !== user.id) redirect("/403");
+  if (!user.roles.includes("auditor") || audit.auditorId !== user.id) redirect("/403");
   if (audit.status !== "DRAFT") redirect(`/audit/${auditId}`);
 
   const prev = await db.finding.findUnique({
@@ -150,7 +153,9 @@ export async function reviewPreviousFinding(formData: FormData): Promise<void> {
         guidingQuestionId: prev.guidingQuestionId,
         locationDetail: prev.locationDetail,
         description: prev.description,
-        kategori: prev.kategori,
+        // A recurring finding is reviewed again in the current period, so its
+        // current priority is decided by Komite Unit after submission.
+        kategori: null,
         isRecurring: true, // temuan berulang (§5.4)
         photoPath: prev.photoPath,
       },
@@ -179,7 +184,7 @@ export async function undoFindingReview(formData: FormData): Promise<void> {
     include: { audit: { select: { auditorId: true, status: true } } },
   });
   if (!review || review.auditId !== auditId) redirect(`/audit/${auditId}`);
-  if (user.roles.includes("auditor") && review.audit.auditorId !== user.id) {
+  if (!user.roles.includes("auditor") || review.audit.auditorId !== user.id) {
     redirect("/403");
   }
   if (review.audit.status !== "DRAFT") redirect(`/audit/${auditId}`);
@@ -200,16 +205,63 @@ export async function deleteFinding(formData: FormData): Promise<void> {
   if (!user || !canAccess(user.roles, "audit")) redirect("/403");
 
   const id = String(formData.get("findingId") ?? "");
-  const auditId = String(formData.get("auditId") ?? "");
-  const finding = await db.finding.findUnique({ where: { id } });
-  if (finding && finding.status === "DRAFT") {
+  const finding = await db.finding.findUnique({
+    where: { id },
+    include: { audit: { select: { auditorId: true, status: true } } },
+  });
+  if (!finding) redirect("/audit");
+  if (!user.roles.includes("auditor") || finding.audit.auditorId !== user.id) {
+    redirect("/403");
+  }
+  if (finding.status === "DRAFT" && finding.audit.status === "DRAFT") {
     await db.finding.delete({ where: { id } });
   }
-  revalidatePath(`/audit/${auditId}`);
+  revalidatePath(`/audit/${finding.auditId}`);
   revalidatePath("/audit");
 }
 
-// Submit final: lock the audit and distribute findings to the area PIC.
+// Komite Unit owns the Low/High decision. Assigning a priority releases the
+// submitted finding to the area's CAPA queue.
+export async function setFindingPriority(formData: FormData): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || !hasAnyRole(user.roles, "komite_unit", "admin")) redirect("/403");
+
+  const parsed = findingPrioritySchema.safeParse({
+    findingId: formData.get("findingId"),
+    priority: formData.get("priority"),
+  });
+  if (!parsed.success) redirect("/audit");
+
+  const finding = await db.finding.findUnique({
+    where: { id: parsed.data.findingId },
+    include: {
+      audit: { select: { id: true, status: true, area: { select: { name: true } } } },
+    },
+  });
+  if (!finding || finding.audit.status !== "SUBMITTED") redirect("/audit");
+
+  await db.finding.update({
+    where: { id: finding.id },
+    data: {
+      kategori: parsed.data.priority,
+      status: "PENDING_CAPA",
+    },
+  });
+
+  await logAction({
+    action: "finding.priority.set",
+    entity: "Finding",
+    summary: `Prioritas temuan #${finding.number} ${finding.audit.area.name} ditetapkan ${parsed.data.priority} oleh Komite Unit.`,
+  });
+
+  revalidatePath(`/audit/${finding.audit.id}`);
+  revalidatePath("/audit");
+  revalidatePath("/capa");
+  revalidatePath("/scores");
+  revalidatePath("/");
+}
+
+// Submit final: lock the audit and send its findings to Komite Unit.
 export async function submitAudit(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
   if (!user || !canAccess(user.roles, "audit")) redirect("/403");
@@ -223,8 +275,13 @@ export async function submitAudit(formData: FormData): Promise<void> {
     },
   });
   if (!audit || audit.status !== "DRAFT") redirect("/audit");
+  if (!user.roles.includes("auditor") || audit.auditorId !== user.id) {
+    redirect("/403");
+  }
 
-  // No minimum-count rule (explicit business decision). Submit as-is.
+  // No minimum-count rule (explicit business decision). Submit as-is. The
+  // findings first enter the Komite priority queue; they are distributed to
+  // the area's CAPA queue after Low/High has been assigned.
   await db.$transaction([
     db.audit.update({
       where: { id: auditId },
@@ -232,7 +289,7 @@ export async function submitAudit(formData: FormData): Promise<void> {
     }),
     db.finding.updateMany({
       where: { auditId },
-      data: { status: "PENDING_CAPA" },
+      data: { status: "PENDING_PRIORITY", kategori: null },
     }),
   ]);
 
@@ -242,7 +299,7 @@ export async function submitAudit(formData: FormData): Promise<void> {
     summary: `Audit ${audit.area.name} dikirim dengan ${audit._count.findings} temuan.`,
   });
 
-  // Findings are distributed to the area PIC's CAPA inbox + appear in queues.
+  // Findings appear in the Komite priority queue first.
   revalidatePath(`/audit/${auditId}`);
   revalidatePath("/audit");
   revalidatePath("/capa");

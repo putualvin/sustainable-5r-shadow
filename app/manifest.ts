@@ -1,13 +1,13 @@
 import type { MetadataRoute } from "next";
 
 // Web App Manifest (served at /manifest.webmanifest). Makes the app installable
-// ("Add to Home Screen") with the Sinar Mas brand red as theme colour.
+// ("Add to Home Screen") with the demo theme colour.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Sustainable 5R",
     short_name: "5R",
     description:
-      "Aplikasi Audit Sustainable 5R — Sinar Mas Agribusiness and Food",
+      "Aplikasi Demonstrasi Audit Sustainable 5R",
     start_url: "/",
     scope: "/",
     display: "standalone",

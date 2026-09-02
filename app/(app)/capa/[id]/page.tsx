@@ -24,13 +24,14 @@ import { CapaForm } from "@/components/forms/capa-form";
 import { CapaStatusBadge } from "@/components/shared/capa-status-badge";
 import { CapaVerify } from "@/components/shared/capa-verify";
 
-export default async function CapaDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { verified?: string; redtag?: string; error?: string };
-}) {
+export default async function CapaDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ verified?: string; redtag?: string; error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const user = await getCurrentUser();
   if (!user || !canAccess(user.roles, "capa")) redirect("/403");
 
@@ -55,7 +56,7 @@ export default async function CapaDetailPage({
     user.roles.includes("auditee") && finding.audit.areaId === user.areaId;
   const isKomite = hasAnyRole(user.roles, "komite_unit", "admin");
   // Auditee may fill/edit only until Komite verifies; then it is locked.
-  const canEdit = isAuditeeOwner && !verified;
+  const canEdit = (isAuditeeOwner || user.roles.includes("admin")) && !verified;
   // The PIC (or admin) may raise a red tag from this finding's CAPA.
   const canRaiseRedTag =
     canAccess(user.roles, "redtag") &&
@@ -104,6 +105,22 @@ export default async function CapaDetailPage({
             </span>
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
               {PILLAR_LABEL[finding.guidingQuestion.pillar]}
+            </span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-xs font-medium",
+                finding.kategori === "HIGH"
+                  ? "bg-danger/10 text-danger"
+                  : finding.kategori === "LOW"
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-warning/10 text-warning"
+              )}
+            >
+              {finding.kategori === "HIGH"
+                ? "Prioritas High"
+                : finding.kategori === "LOW"
+                  ? "Prioritas Low"
+                  : "Menunggu prioritas Komite"}
             </span>
             <CardTitle className="text-base">
               {finding.guidingQuestion.subCategory}

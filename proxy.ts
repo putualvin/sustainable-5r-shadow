@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Role } from "@prisma/client";
 import { emailToRoles, canAccess, sectionForPath } from "@/lib/rbac";
+import { appConfig } from "@/lib/app-config";
 
 const COOKIE_NAME = "session_email";
 const ROLES_COOKIE = "session_roles";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const email = request.cookies.get(COOKIE_NAME)?.value;
   const rolesRaw = request.cookies.get(ROLES_COOKIE)?.value;
@@ -20,6 +21,13 @@ export function middleware(request: NextRequest) {
   const loggedIn = roles.length > 0;
 
   const isLogin = pathname === "/login";
+
+  // Fail closed when a production deployment forgets to configure real auth.
+  // APP_MODE=demo must be explicitly set in Vercel for this public prototype.
+  if (!appConfig.isDemo) {
+    if (isLogin) return NextResponse.next();
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
 
   // Not logged in → only /login allowed.
   if (!loggedIn) {

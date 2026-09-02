@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
 import { addDocument, type DocumentActionState } from "@/lib/actions/document";
 import { DOC_CATEGORIES } from "@/lib/documents";
@@ -14,7 +15,7 @@ const selectClass =
   "flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function DocumentForm() {
-  const [state, formAction] = useFormState<DocumentActionState, FormData>(
+  const [state, formAction] = useActionState<DocumentActionState, FormData>(
     addDocument,
     {}
   );
@@ -29,7 +30,7 @@ export function DocumentForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="title">Judul dokumen</Label>
-          <Input id="title" name="title" placeholder="mis. Guidelines Sustainable 5R v.2" />
+          <Input id="title" name="title" placeholder="mis. Panduan Demo 5R" />
         </div>
 
         <div className="space-y-2">

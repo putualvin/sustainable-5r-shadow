@@ -21,18 +21,18 @@ const ROLE_ACCOUNTS = [
 
 // One PIC (auditee) per area — pic.<code>@5r.local, linked to that area.
 const AREA_PICS = [
-  { name: "Refinery Lt 1", code: "REF-1" },
-  { name: "Refinery Lt 2", code: "REF-2" },
-  { name: "Refinery Lt 3", code: "REF-3" },
-  { name: "Fraksinasi Lt 1", code: "FRA-1" },
-  { name: "Fraksinasi Lt 2", code: "FRA-2" },
-  { name: "Fraksinasi Lt 3", code: "FRA-3" },
-  { name: "Storage Area", code: "STG" },
-  { name: "Loading Bay", code: "LDB" },
-  { name: "Control Room", code: "CTR" },
-  { name: "Workshop", code: "WSH" },
-  { name: "Office Area", code: "OFF" },
-  { name: "Laboratory", code: "LAB" },
+  { name: "Zona A - Lantai 1", code: "REF-1" },
+  { name: "Zona A - Lantai 2", code: "REF-2" },
+  { name: "Zona A - Lantai 3", code: "REF-3" },
+  { name: "Zona B - Lantai 1", code: "FRA-1" },
+  { name: "Zona B - Lantai 2", code: "FRA-2" },
+  { name: "Zona B - Lantai 3", code: "FRA-3" },
+  { name: "Gudang Simulasi", code: "STG" },
+  { name: "Area Penerimaan", code: "LDB" },
+  { name: "Ruang Operasi", code: "CTR" },
+  { name: "Area Perawatan", code: "WSH" },
+  { name: "Area Administrasi", code: "OFF" },
+  { name: "Ruang Pengujian", code: "LAB" },
 ];
 
 export function LoginForm() {
@@ -123,7 +123,7 @@ export function LoginForm() {
           <p className="mb-1.5 text-xs font-medium text-muted-foreground">
             PIC Area (Auditee) ·{" "}
             <span className="font-normal">
-              PIC Fraksinasi Lt 1 merangkap Auditor (contoh multi-peran)
+              PIC Zona B - Lantai 1 merangkap Auditor (contoh multi-peran)
             </span>
           </p>
           <ul className="grid max-h-44 grid-cols-1 gap-1 overflow-y-auto rounded-md border p-1.5 sm:grid-cols-2">

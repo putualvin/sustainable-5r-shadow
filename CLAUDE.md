@@ -17,7 +17,7 @@ Selain dua hal di atas, ikuti spec apa adanya. Aturan terkunci §5 menang.
 
 ## 1. Apa yang sedang kita bangun
 
-Aplikasi digitalisasi program **Sustainable 5R** (Ringkas, Rapi, Resik, Rawat, Rajin) untuk Sinar Mas Agribusiness and Food — Downstream Indonesia, unit pilot **Refinery 2 (12 area)**. Menggantikan proses manual (form kertas, kompilasi Excel, laporan PPT).
+Aplikasi demonstrasi digitalisasi program **Sustainable 5R** (Ringkas, Rapi, Resik, Rawat, Rajin) untuk fasilitas industri generik dengan **12 area simulasi**. Seluruh data dalam repository publik ini wajib berupa data dummy.
 
 Ekosistem penuh, **3 modul fungsional yang saling terpisah**:
 1. **Audit 5R** — inspeksi bulanan cross-area berbasis Guiding Questions → temuan → tindak lanjut → penilaian status oleh Komite → scoring.
@@ -28,7 +28,7 @@ Plus: dashboard real-time, laporan bulanan auto-generate, role-based access (6 r
 
 ### Sifat proyek (penting untuk keputusan teknis)
 - **Demo-focused, bukan production-grade.** Utamakan: jalan, jelas, mudah didemokan. Bukan: skalabilitas, auth enterprise, optimasi.
-- Boleh pakai **seed data dummy** yang realistis (12 area Refinery 2, contoh temuan, contoh user tiap role).
+- Boleh pakai **seed data dummy** yang realistis (12 area generik, contoh temuan, contoh user tiap role).
 - Tidak perlu integrasi eksternal (SAP/ERP/QMS) — di luar scope.
 
 ---
@@ -37,7 +37,7 @@ Plus: dashboard real-time, laporan bulanan auto-generate, role-based access (6 r
 
 | Layer | Pilihan |
 |---|---|
-| Framework | **Next.js 14** (App Router) |
+| Framework | **Next.js 16** (App Router) |
 | Bahasa | **TypeScript** (strict) |
 | Database | **PostgreSQL (Neon)** via Prisma — lihat §0 |
 | ORM | **Prisma** |
@@ -56,13 +56,13 @@ Plus: dashboard real-time, laporan bulanan auto-generate, role-based access (6 r
 
 ## 3. Brand & Desain
 
-Palet Sinar Mas:
+Palet demonstrasi:
 - Primary merah `#E30613`, hitam `#1A1A1A`, grey `#B3B3B3`
 - Sekunder: kuning `#F5C518`, oranye `#E89A1F`, teal `#1A8A8A`, hijau `#8BC972`
 
 Status temuan punya **warna konsisten di seluruh app** (baca dulu sebelum bikin komponen):
 - Done → hijau · Progress → kuning/amber · No Progress → merah
-- Kategori: Low → netral/abu · High → merah
+- Prioritas Komite: Low → netral/abu · High → merah
 - Red Tag deadline: aman → hijau · mendekati → amber · lewat → merah
 
 Prinsip: High Signal/Low Noise, whitespace longgar, layout organik (hindari tampilan korporat yang kaku/simetris-sempurna). Tiap layar punya **satu aksi utama** yang jelas.
@@ -92,7 +92,8 @@ Ini inti yang membedakan app ini. **Patuhi persis.**
 - Audit **cross-area**: auditor menilai area yang **bukan miliknya**.
 - Siklus **bulanan**. Audit awal bulan (tgl 1–10 sesuai guidelines).
 - **Target temuan per area = 21** = **20 dari guiding question + 1 temuan berulang**.
-- Auditor **hanya mencatat temuan**: deskripsi, **kategori Low/High**, foto bukti. **Auditor TIDAK menetapkan status Done/Progress/No Progress.**
+- Auditor **hanya mencatat temuan**: kategori 5R, lokasi, deskripsi, dan foto bukti. Auditor meninjau temuan bulan lalu beserta prioritas dan status CAPA sebelum mencatat temuan periode berjalan.
+- **Komite Unit menetapkan prioritas Low/High** setelah audit dikirim. Auditor tidak menetapkan prioritas maupun status Done/Progress/No Progress.
 - Output auditor termasuk **foto board**.
 
 ### 5.2 Tindak lanjut (oleh Auditee)
@@ -129,7 +130,7 @@ Score Akhir = Nilai Utama − Temuan Berulang − Parking Lot
 4. Audit dilakukan bukan oleh auditor area (bukan auditor 100% / auditor area 0%)
 
 ### 5.6 Daily Checklist
-- Item **yes/no area-specific** (mis. ±14 item grup Refinery, ±10 item grup Fractionation; sebagian area belum punya item → tampilkan **empty state jelas**, bukan error).
+- Item **yes/no area-specific** (mis. ±14 item Zona A, ±10 item Zona B; sebagian area belum punya item → tampilkan **empty state jelas**, bukan error).
 - Harian, reset tiap hari. Reminder push (untuk demo: indikator/notifikasi in-app cukup).
 - Target compliance >90%.
 
@@ -164,11 +165,11 @@ Score Akhir = Nilai Utama − Temuan Berulang − Parking Lot
 
 Entitas inti (minimal):
 - `User` (id, nama, role, areaId?) — role: ADMIN, KOMITE, AUDITOR, AUDITEE, REDTAG, MANAGEMENT *(catatan §0: di shadow build pakai `roles[]` multi-role)*
-- `Area` (id, nama, grup) — 12 area Refinery 2
+- `Area` (id, nama, grup) — 12 area simulasi
 - `AuditCycle` (id, periode, status) — siklus bulanan
 - `AuditAssignment` (id, cycleId, areaId, auditorId)
 - `GuidingQuestion` (id, prinsipR, teks) — 5R
-- `Finding` (id, assignmentId, areaId, guidingQuestionId?, deskripsi, kategori[LOW|HIGH], isRecurring, fotoPaths[], status[OPEN|PROGRESS|NO_PROGRESS|DONE]?, statusSetByKomite)
+- `Finding` (id, assignmentId, areaId, guidingQuestionId?, deskripsi, priority[LOW|HIGH]?, isRecurring, fotoPaths[], workflowStatus[PENDING_PRIORITY|PENDING_CAPA], prioritySetByKomite)
 - `FollowUp` (id, findingId, rootCause, corrective, preventive, woScPoNumber?, fotoPaths[])
 - `Score` (id, cycleId, areaId, nilaiUtama, temuanBerulang, parkingLot, scoreAkhir)
 - `ChecklistItem` (id, areaId, teks) — yes/no, area-specific
@@ -185,11 +186,11 @@ Demo-ready setelah **Modul 0–4**. Bangun bertahap, jangan loncat.
 
 | # | Modul | Isi | Demo-ready? |
 |---|---|---|---|
-| **0** | Setup | Next.js 14 + Prisma + Tailwind, schema awal, seed data (12 area, user tiap role, guiding questions, contoh temuan) | — |
+| **0** | Setup | Next.js 16 + Prisma + Tailwind, schema awal, seed data (12 area, user tiap role, guiding questions, contoh temuan) | — |
 | **1** | Auth & Role Shell | Login sederhana + role switcher demo, layout per role, navigasi | — |
-| **2** | Audit (Auditor) | Penugasan, daftar Guiding Questions per prinsip R, catat temuan (Low/High, foto), tandai baru/berulang, review & kirim | — |
+| **2** | Audit (Auditor) | Penugasan, review audit bulan lalu + status CAPA, daftar Guiding Questions per prinsip R, catat temuan dan foto, kirim ke Komite | — |
 | **3** | Tindak Lanjut (Auditee) | Terima temuan, isi root cause/corrective/preventive, WO/SC/PO untuk Progress, upload foto, batas 25 & cut-off 17.00 | — |
-| **4** | Penilaian & Scoring (Komite) | Nilai status Done/Progress/No Progress, hitung Nilai Utama, Temuan Berulang, Parking Lot, **Score Akhir** | ✅ **demo inti** |
+| **4** | Penilaian & Scoring (Komite) | Tetapkan prioritas Low/High; nilai status Done/Progress/No Progress; hitung Nilai Utama, Temuan Berulang, Parking Lot, **Score Akhir** | ✅ **demo inti** |
 | 5 | Daily Checklist | Item area-specific, isi harian, empty state, compliance | ✅ |
 | 6 | Red Tag | Registrasi, QR, deadline 30/90, lifecycle, reminder | ✅ |
 | 7 | Dashboard | Skor per area, tren, compliance, Red Tag, open follow-up (recharts) | ✅ |
@@ -213,7 +214,7 @@ Demo-ready setelah **Modul 0–4**. Bangun bertahap, jangan loncat.
 
 - **BRD Sustainable 5R** (BRD-5R-2026-001) — kebutuhan bisnis & requirement lengkap.
 - **Materi Training 5R 2026 v2** — tata cara scoring, Bobot Scoring, Parking Lot, Temuan Berulang.
-- **Guidelines Sustainable 5R v.2** — mekanisme audit & penilaian.
+- **Panduan Demo 5R** — referensi simulasi mekanisme audit & penilaian.
 - **Flow aktivitas "Audit Sustainable 5R"** (swimlane Komite/Auditor/Auditee) yang disepakati.
 
 Jika ragu antara dokumen dan file ini, **§5 (Aturan Terkunci) menang** kecuali diberitahu sebaliknya.

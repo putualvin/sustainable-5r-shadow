@@ -15,11 +15,12 @@ const FILTERS = [
   { key: "done", label: "Selesai" },
 ];
 
-export default async function RedTagListPage({
-  searchParams,
-}: {
-  searchParams: { filter?: string; created?: string };
-}) {
+export default async function RedTagListPage(
+  props: {
+    searchParams: Promise<{ filter?: string; created?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user) return null;
 

@@ -14,7 +14,7 @@ describe("emailToRoles", () => {
     expect(emailToRoles("admin@5r.local")).toEqual(["admin"]);
     expect(emailToRoles("komite@5r.local")).toEqual(["komite_unit"]);
     expect(emailToRoles("auditor1@5r.local")).toEqual(["auditor"]);
-    expect(emailToRoles("pic.refinery2@5r.local")).toEqual(["auditee"]);
+    expect(emailToRoles("pic.ref-2@5r.local")).toEqual(["auditee"]);
     expect(emailToRoles("redtag@5r.local")).toEqual(["kord_red_tag"]);
     expect(emailToRoles("gm@5r.local")).toEqual(["management"]);
   });

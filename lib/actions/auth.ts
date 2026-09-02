@@ -5,10 +5,18 @@ import { createSession, destroySession } from "@/lib/auth";
 import { emailToRoles } from "@/lib/rbac";
 import { db } from "@/lib/db";
 import { loginSchema } from "@/lib/schemas/auth";
+import { appConfig } from "@/lib/app-config";
 
 export type LoginResult = { error?: string };
 
 export async function loginAction(input: unknown): Promise<LoginResult> {
+  if (!appConfig.isDemo) {
+    return {
+      error:
+        "Login demo dinonaktifkan. Konfigurasikan autentikasi enterprise sebelum pilot.",
+    };
+  }
+
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Data login tidak valid." };
@@ -31,18 +39,20 @@ export async function loginAction(input: unknown): Promise<LoginResult> {
       ? dbUser.roles
       : prefixRoles;
 
-  createSession(email, roles);
+  await createSession(email, roles);
   redirect("/");
 }
 
 export async function logoutAction(): Promise<void> {
-  destroySession();
+  await destroySession();
   redirect("/login");
 }
 
 // Demo role switcher (§4): instantly become a known demo account without
 // logging out. Mock auth only — resolves roles from the DB (or email prefix).
 export async function switchRole(formData: FormData): Promise<void> {
+  if (!appConfig.isDemo) redirect("/login");
+
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const prefixRoles = emailToRoles(email);
   if (prefixRoles.length === 0) redirect("/login");
@@ -53,6 +63,6 @@ export async function switchRole(formData: FormData): Promise<void> {
       ? dbUser.roles
       : prefixRoles;
 
-  createSession(email, roles);
+  await createSession(email, roles);
   redirect("/");
 }

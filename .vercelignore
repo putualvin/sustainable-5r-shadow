@@ -1,0 +1,4 @@
+coverage
+docs
+scripts/e2e.mjs
+*.md

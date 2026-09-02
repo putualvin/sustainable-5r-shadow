@@ -10,7 +10,8 @@ import { RETENTION_DAYS } from "../lib/redtag";
 
 const db = new PrismaClient();
 
-// Official 5R taxonomy — 27 sub-categories (Guidelines Sustainable 5R v.2).
+// Generic 5R taxonomy for the public demo. The labels are intentionally
+// organization-neutral and must not be treated as an approved company standard.
 const GUIDING_QUESTIONS: {
   pillar: Pillar;
   subCategory: string;
@@ -73,34 +74,35 @@ const SCORE_TALLIES: {
   { code: "LAB", done: 17, progress: 4, noProgress: 1, recurring: 1 },
 ];
 
-// Daily Checklist items per parent group (from AppSheet documentation, verbatim).
+// Synthetic checklist items for the public demo. They demonstrate the two
+// checklist groups without exposing plant-specific locations or equipment.
 const CHECKLIST_ITEMS: { group: AreaGroup; text: string }[] = [
-  // Refinery (14)
-  { group: "REFINERY", text: "Apakah drip pan pompa pompa Refinery dalam kondisi bersih" },
-  { group: "REFINERY", text: "Apakah drip pan dan area D304 dan D300 dalam kondisi bersih" },
-  { group: "REFINERY", text: "Apakah area control room Refinery bersih, tidak berminyak, dan berdebu" },
-  { group: "REFINERY", text: "Apakah area HPB dan compressor tidak ada ceceran minyak" },
-  { group: "REFINERY", text: "Apakah area sampling point bersih" },
-  { group: "REFINERY", text: "Apakah Strainer in plant dalam kondisi bersih" },
-  { group: "REFINERY", text: "Apakah Counter Bag filter sesuai actual stock" },
-  { group: "REFINERY", text: "Apakah ada ceceran minyak dan tumpahan SBE di area SBE" },
-  { group: "REFINERY", text: "Apakah ada tumpahan BE dan PA di area unloading" },
-  { group: "REFINERY", text: "Apakah ada pressure indicator yang abnormal" },
-  { group: "REFINERY", text: "Apakah ada barang yang tidak pada tempatnya (sarung tangan, majun, dll)" },
-  { group: "REFINERY", text: "Apakah ada barang yang tidak pada tempatnya (sepatu, sarung tangan, helm)" },
-  { group: "REFINERY", text: "Apakah area wastafel lantai 1 bersih, tidak becek, dan sabun terisi" },
-  { group: "REFINERY", text: "Apakah area wastafel lantai 2 tidak becek dan terisi sabun" },
-  // Fractionation (10)
-  { group: "FRACTIONATION", text: "Apakah drip pan pompa dan HE fractionation dalam kondisi bersih" },
-  { group: "FRACTIONATION", text: "Apakah drip pan pompa di filling room B dalam kondisi bersih" },
-  { group: "FRACTIONATION", text: "Apakah drip pan pompa di filling room C dalam kondisi bersih" },
-  { group: "FRACTIONATION", text: "Apakah ada ceceran minyak di lantai area coldroom dan filling room" },
-  { group: "FRACTIONATION", text: "Apakah ada ceceran minyak di lantai area ruang filter press" },
-  { group: "FRACTIONATION", text: "Apakah ada tumpahan / genangan di area pencucian filter leaf" },
-  { group: "FRACTIONATION", text: "Apakah area sparepart terkunci dan dalam keadaan rapi" },
-  { group: "FRACTIONATION", text: "Apakah jendela belakang filter press room di lantai 3 tertutup" },
-  { group: "FRACTIONATION", text: "Apakah kotak APD di lantai 1 untuk masuk area H-2 terisi cukup" },
-  { group: "FRACTIONATION", text: "Apakah kotak APD di lantai 2 untuk masuk area H-2 terisi cukup" },
+  // Zone A (14)
+  { group: "REFINERY", text: "Apakah lantai area kerja bersih dan kering" },
+  { group: "REFINERY", text: "Apakah pelindung tetesan pada peralatan dalam kondisi bersih" },
+  { group: "REFINERY", text: "Apakah panel dan indikator peralatan terlihat normal" },
+  { group: "REFINERY", text: "Apakah jalur pejalan kaki bebas dari hambatan" },
+  { group: "REFINERY", text: "Apakah titik pemeriksaan mudah diakses dan bersih" },
+  { group: "REFINERY", text: "Apakah alat kerja dikembalikan ke lokasi berlabel" },
+  { group: "REFINERY", text: "Apakah jumlah bahan habis pakai sesuai batas minimum dan maksimum" },
+  { group: "REFINERY", text: "Apakah tempat sampah tersedia dan tidak meluap" },
+  { group: "REFINERY", text: "Apakah area penerimaan barang bebas dari material tercecer" },
+  { group: "REFINERY", text: "Apakah tidak ada tanda kerusakan atau kondisi abnormal" },
+  { group: "REFINERY", text: "Apakah perlengkapan kerja tersimpan pada tempatnya" },
+  { group: "REFINERY", text: "Apakah alat pelindung diri tersimpan rapi dan lengkap" },
+  { group: "REFINERY", text: "Apakah fasilitas cuci tangan bersih dan tersedia sabun" },
+  { group: "REFINERY", text: "Apakah papan informasi area dalam kondisi terbaru" },
+  // Zone B (10)
+  { group: "FRACTIONATION", text: "Apakah lantai dan permukaan kerja bersih dari tumpahan" },
+  { group: "FRACTIONATION", text: "Apakah alat bantu kerja tersusun sesuai label" },
+  { group: "FRACTIONATION", text: "Apakah wadah material tertutup dan beridentitas" },
+  { group: "FRACTIONATION", text: "Apakah jalur evakuasi bebas dari hambatan" },
+  { group: "FRACTIONATION", text: "Apakah area penyimpanan sementara dalam kondisi rapi" },
+  { group: "FRACTIONATION", text: "Apakah tidak ada genangan di area pencucian umum" },
+  { group: "FRACTIONATION", text: "Apakah lemari perlengkapan terkunci dan tertata" },
+  { group: "FRACTIONATION", text: "Apakah pintu dan jendela area dalam kondisi aman" },
+  { group: "FRACTIONATION", text: "Apakah persediaan alat pelindung diri mencukupi" },
+  { group: "FRACTIONATION", text: "Apakah catatan inspeksi harian telah diperbarui" },
 ];
 
 // Reference documents for the repository (Module 7). fileUrl left null —
@@ -111,10 +113,10 @@ const DOCUMENTS: {
   version: string;
   description: string;
 }[] = [
-  { title: "Guidelines Sustainable 5R v.2", category: "PANDUAN", version: "v2.0", description: "Panduan resmi 5R beserta 27 guiding questions (Des 2025)." },
-  { title: "SOP Pelaksanaan Audit 5R", category: "SOP", version: "v1.2", description: "Tata cara audit bulanan lintas area oleh auditor." },
-  { title: "SOP Pengelolaan Red Tag", category: "SOP", version: "v1.0", description: "Alur registrasi hingga keputusan disposal barang red tag." },
-  { title: "Standar Area Refinery", category: "STANDARD", version: "v1.1", description: "Standar kondisi 5R untuk area Refinery Lt 1–3." },
+  { title: "Panduan Demo 5R", category: "PANDUAN", version: "v1.0", description: "Contoh panduan 5R untuk demonstrasi aplikasi." },
+  { title: "Contoh Prosedur Audit 5R", category: "SOP", version: "v1.0", description: "Contoh tata cara audit bulanan lintas area." },
+  { title: "Contoh Prosedur Red Tag", category: "SOP", version: "v1.0", description: "Contoh alur registrasi dan keputusan barang red tag." },
+  { title: "Contoh Standar Area", category: "STANDARD", version: "v1.0", description: "Contoh standar kondisi 5R untuk fasilitas simulasi." },
   { title: "Template Temuan & CAPA", category: "TEMPLATE", version: "v1.0", description: "Format isian temuan audit dan rencana CAPA." },
   { title: "Formulir Checklist Harian", category: "FORMULIR", version: "v1.0", description: "Cetakan checklist harian per shift untuk PIC area." },
 ];
@@ -131,20 +133,21 @@ function periodMonthsAgo(n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// 12 areas of pilot unit "Refinery 2".
+// Twelve synthetic areas for the public demo. Codes are stable database keys;
+// displayed names are deliberately generic.
 const AREAS: { code: string; name: string; group: AreaGroup | null }[] = [
-  { code: "REF-1", name: "Refinery Lt 1", group: "REFINERY" },
-  { code: "REF-2", name: "Refinery Lt 2", group: "REFINERY" },
-  { code: "REF-3", name: "Refinery Lt 3", group: "REFINERY" },
-  { code: "FRA-1", name: "Fraksinasi Lt 1", group: "FRACTIONATION" },
-  { code: "FRA-2", name: "Fraksinasi Lt 2", group: "FRACTIONATION" },
-  { code: "FRA-3", name: "Fraksinasi Lt 3", group: "FRACTIONATION" },
-  { code: "STG", name: "Storage Area", group: null },
-  { code: "LDB", name: "Loading Bay", group: null },
-  { code: "CTR", name: "Control Room", group: null },
-  { code: "WSH", name: "Workshop", group: null },
-  { code: "OFF", name: "Office Area", group: null },
-  { code: "LAB", name: "Laboratory", group: null },
+  { code: "REF-1", name: "Zona A - Lantai 1", group: "REFINERY" },
+  { code: "REF-2", name: "Zona A - Lantai 2", group: "REFINERY" },
+  { code: "REF-3", name: "Zona A - Lantai 3", group: "REFINERY" },
+  { code: "FRA-1", name: "Zona B - Lantai 1", group: "FRACTIONATION" },
+  { code: "FRA-2", name: "Zona B - Lantai 2", group: "FRACTIONATION" },
+  { code: "FRA-3", name: "Zona B - Lantai 3", group: "FRACTIONATION" },
+  { code: "STG", name: "Gudang Simulasi", group: null },
+  { code: "LDB", name: "Area Penerimaan", group: null },
+  { code: "CTR", name: "Ruang Operasi", group: null },
+  { code: "WSH", name: "Area Perawatan", group: null },
+  { code: "OFF", name: "Area Administrasi", group: null },
+  { code: "LAB", name: "Ruang Pengujian", group: null },
 ];
 
 async function main() {
@@ -159,7 +162,7 @@ async function main() {
     });
   }
 
-  const refinery2 = await db.area.findUnique({ where: { code: "REF-2" } });
+  const demoArea = await db.area.findUnique({ where: { code: "REF-2" } });
 
   // 7 mock users covering all 6 roles (emails chosen so prefix→role mapping works).
   const users: {
@@ -169,12 +172,12 @@ async function main() {
     areaCode?: string;
   }[] = [
     { email: "admin@5r.local", name: "Admin Sistem", roles: ["admin"] },
-    { email: "komite@5r.local", name: "Halim (Komite Unit)", roles: ["komite_unit"] },
-    { email: "auditor1@5r.local", name: "Muhib (Auditor)", roles: ["auditor"] },
-    { email: "auditor2@5r.local", name: "Auditor Kedua", roles: ["auditor"] },
+    { email: "komite@5r.local", name: "Komite Demo", roles: ["komite_unit"] },
+    { email: "auditor1@5r.local", name: "Auditor Demo 1", roles: ["auditor"] },
+    { email: "auditor2@5r.local", name: "Auditor Demo 2", roles: ["auditor"] },
     {
-      email: "pic.refinery2@5r.local",
-      name: "PIC Refinery Lt 2",
+      email: "pic.ref-2@5r.local",
+      name: "PIC Zona A - Lantai 2",
       roles: ["auditee"],
       areaCode: "REF-2",
     },
@@ -184,7 +187,7 @@ async function main() {
 
   for (const u of users) {
     const areaId =
-      u.areaCode === "REF-2" ? refinery2?.id ?? null : null;
+      u.areaCode === "REF-2" ? demoArea?.id ?? null : null;
     await db.user.upsert({
       where: { email: u.email },
       update: { name: u.name, roles: u.roles, areaId },
@@ -193,9 +196,9 @@ async function main() {
   }
 
   // A PIC (auditee) account per area so every audited area has a receiver for
-  // its findings (audit -> CAPA loop works for all 12 areas, not just REF-2).
+  // its findings and the audit -> CAPA loop works across the demo facility.
   // Email convention: pic.<area-code>@5r.local (prefix "pic" -> auditee role).
-  // FRA-1's PIC also holds the auditor role to demonstrate multi-role (one
+  // The first Zone B PIC also holds the auditor role to demonstrate multi-role (one
   // person who is both auditee for their area and an auditor elsewhere — the
   // schedule generator never assigns them to audit their own area).
   const allAreasForPic = await db.area.findMany({ orderBy: { code: "asc" } });
@@ -287,15 +290,14 @@ async function main() {
     }
   }
 
-  // A submitted audit for REF-2 with findings awaiting CAPA — gives the PIC
-  // (pic.refinery2) an inbox and lets the audit->CAPA->score loop be demoed.
-  const ref2 = await db.area.findUnique({ where: { code: "REF-2" } });
-  if (ref2 && auditor1 && (await db.audit.count({ where: { areaId: ref2.id, period } })) === 0) {
+  // A submitted audit for the primary demo area gives its PIC an inbox and
+  // lets the audit -> CAPA -> score loop be demonstrated.
+  if (demoArea && auditor1 && (await db.audit.count({ where: { areaId: demoArea.id, period } })) === 0) {
     const gqs = await db.guidingQuestion.findMany({ orderBy: { order: "asc" } });
     const pick = (sub: string) => gqs.find((g) => g.subCategory === sub)!;
     const audit = await db.audit.create({
       data: {
-        areaId: ref2.id,
+        areaId: demoArea.id,
         auditorId: auditor1.id,
         period,
         status: "SUBMITTED",
@@ -304,11 +306,11 @@ async function main() {
       },
     });
     const findingSeeds = [
-      { gq: pick("Lantai"), location: "Dekat pompa P-101", description: "Ceceran oli di lantai area pompa.", kategori: "HIGH" as const, isRecurring: true },
-      { gq: pick("Garis Demarkasi"), location: "Area drum", description: "Drum diletakkan di luar garis demarkasi.", kategori: "LOW" as const, isRecurring: false },
-      { gq: pick("Material dan atau Suku cadang"), location: "Rak B2", description: "Material tidak terpakai menumpuk di rak.", kategori: "LOW" as const, isRecurring: false },
-      { gq: pick("SOP"), location: "Panel kontrol", description: "SOP 5R tidak terpasang/usang.", kategori: "HIGH" as const, isRecurring: false },
-      { gq: pick("Promosi 5R"), location: "Dinding lorong", description: "Tidak ada slogan/visual budaya 5R.", kategori: "LOW" as const, isRecurring: false },
+      { gq: pick("Lantai"), location: "Stasiun kerja A", description: "Lantai belum dibersihkan setelah kegiatan simulasi.", kategori: "HIGH" as const, isRecurring: true },
+      { gq: pick("Garis Demarkasi"), location: "Area penyimpanan A", description: "Satu wadah ditempatkan di luar garis demarkasi.", kategori: "LOW" as const, isRecurring: false },
+      { gq: pick("Material dan atau Suku cadang"), location: "Rak contoh B", description: "Barang nonaktif belum dipindahkan dari rak kerja.", kategori: "LOW" as const, isRecurring: false },
+      { gq: pick("SOP"), location: "Papan informasi", description: "Salinan instruksi kerja demo belum diperbarui.", kategori: "HIGH" as const, isRecurring: false },
+      { gq: pick("Promosi 5R"), location: "Koridor utama", description: "Media pengingat budaya 5R belum tersedia.", kategori: "LOW" as const, isRecurring: false },
     ];
     for (const f of findingSeeds) {
       await db.finding.create({
@@ -331,9 +333,9 @@ async function main() {
   // verification (Masih ada → temuan berulang / Sudah ditangani).
   const lastPeriod = periodMonthsAgo(1);
   const reviewSchedule =
-    auditor1 && ref2
+    auditor1 && demoArea
       ? await db.auditSchedule.findFirst({
-          where: { period, auditorId: auditor1.id, areaId: { not: ref2.id } },
+          where: { period, auditorId: auditor1.id, areaId: { not: demoArea.id } },
           orderBy: { area: { code: "asc" } },
         })
       : null;
@@ -356,12 +358,13 @@ async function main() {
       },
     });
     const prevSeeds = [
-      { gq: pick("Lantai"), location: "Area filling", description: "Tumpahan minyak belum dibersihkan tuntas di area filling.", kategori: "HIGH" as const },
-      { gq: pick("Garis Demarkasi"), location: "Jalur forklift", description: "Garis demarkasi jalur forklift pudar.", kategori: "LOW" as const },
-      { gq: pick("Material dan atau Suku cadang"), location: "Rak sparepart", description: "Sparepart tidak terpakai menumpuk di rak.", kategori: "LOW" as const },
+      { gq: pick("Lantai"), location: "Stasiun kerja B", description: "Sisa material simulasi belum dibersihkan tuntas.", kategori: "HIGH" as const },
+      { gq: pick("Garis Demarkasi"), location: "Jalur pejalan kaki", description: "Garis demarkasi jalur pejalan kaki mulai pudar.", kategori: "LOW" as const },
+      { gq: pick("Material dan atau Suku cadang"), location: "Rak karantina", description: "Barang nonaktif masih tersimpan pada rak aktif.", kategori: "LOW" as const },
     ];
-    for (const f of prevSeeds) {
-      await db.finding.create({
+    const previousStatuses = ["PROGRESS", "DONE", "NO_PROGRESS"] as const;
+    for (const [index, f] of prevSeeds.entries()) {
+      const prevFinding = await db.finding.create({
         data: {
           auditId: prevAudit.id,
           guidingQuestionId: f.gq.id,
@@ -372,93 +375,111 @@ async function main() {
           status: "PENDING_CAPA",
         },
       });
+      await db.capa.create({
+        data: {
+          findingId: prevFinding.id,
+          rootCause: "Penyebab temuan telah dianalisis oleh PIC area.",
+          correctiveAction: "Tindakan korektif bulan lalu telah dicatat.",
+          preventiveAction: "Tindakan preventif dipantau sampai selesai.",
+          woScPoNumber: index === 0 ? "DEMO-WO-001" : null,
+          dueDate: new Date(`${lastPeriod}-20T10:00:00+07:00`),
+          status: previousStatuses[index],
+          verifiedAt: new Date(`${lastPeriod}-21T10:00:00+07:00`),
+          verifiedBy: "Komite Unit Demo",
+        },
+      });
     }
   }
 
-  // The auditee has filled CAPA for 2 REF-2 findings — status left null so they
+  // The auditee has filled CAPA for two demo-area findings — status left null so they
   // sit in the Komite's "Menunggu Verifikasi" queue (the auditee does NOT set
   // the closing status; Komite does during verification). Seeded once.
-  if (ref2 && (await db.capa.count({ where: { finding: { audit: { areaId: ref2.id } } } })) === 0) {
-    const ref2Findings = await db.finding.findMany({
-      where: { audit: { areaId: ref2.id }, capa: { is: null } },
+  if (demoArea && (await db.capa.count({ where: { finding: { audit: { areaId: demoArea.id } } } })) === 0) {
+    const demoFindings = await db.finding.findMany({
+      where: { audit: { areaId: demoArea.id }, capa: { is: null } },
       orderBy: { createdAt: "asc" },
       take: 2,
     });
     const capaSeeds = [
       {
-        rootCause: "Seal pompa P-101 bocor sehingga oli menetes ke lantai.",
-        correctiveAction: "Membersihkan ceceran dan mengganti seal pompa.",
-        preventiveAction: "Menjadwalkan inspeksi seal pompa setiap minggu.",
-        woScPoNumber: "WO-2026-0456", // sudah ada WO → Komite bisa set Progress
+        rootCause: "Penutup wadah kerja tidak terpasang sempurna setelah digunakan.",
+        correctiveAction: "Membersihkan area dan memasang kembali penutup wadah.",
+        preventiveAction: "Menambahkan pemeriksaan penutup pada checklist harian.",
+        woScPoNumber: "DEMO-WO-002", // nomor demo → Komite bisa set Progress
       },
       {
-        rootCause: "Garis demarkasi pudar dan drum tidak dikembalikan ke tempatnya.",
-        correctiveAction: "Mengecat ulang garis dan menata ulang drum.",
-        preventiveAction: "Audit penataan harian oleh PIC shift.",
+        rootCause: "Penanda lokasi pudar dan wadah tidak dikembalikan ke tempatnya.",
+        correctiveAction: "Memperbarui penanda dan menata ulang wadah.",
+        preventiveAction: "Melakukan pemeriksaan penataan harian oleh PIC shift.",
         woScPoNumber: null, // belum ada WO → Progress diblokir sampai dilengkapi
       },
     ];
-    for (let i = 0; i < ref2Findings.length && i < capaSeeds.length; i++) {
+    for (let i = 0; i < demoFindings.length && i < capaSeeds.length; i++) {
       await db.capa.create({
-        data: { findingId: ref2Findings[i].id, ...capaSeeds[i] },
+        data: { findingId: demoFindings[i].id, ...capaSeeds[i] },
       });
     }
   }
 
-  // Backfill (idempotent): make sure at least one REF-2 CAPA carries a WO number
+  // Backfill (idempotent): make sure at least one demo CAPA carries a WO number
   // (so Komite can demo "Progress") even on already-seeded DBs. Sets it on a
   // single CAPA only when none has one yet.
-  if (ref2) {
+  if (demoArea) {
     const anyWo = await db.capa.count({
-      where: { woScPoNumber: { not: null }, finding: { audit: { areaId: ref2.id } } },
+      where: { woScPoNumber: { not: null }, finding: { audit: { areaId: demoArea.id } } },
     });
     if (anyWo === 0) {
       const target = await db.capa.findFirst({
-        where: { woScPoNumber: null, finding: { audit: { areaId: ref2.id } } },
+        where: { woScPoNumber: null, finding: { audit: { areaId: demoArea.id } } },
         orderBy: { createdAt: "asc" },
       });
       if (target) {
         await db.capa.update({
           where: { id: target.id },
-          data: { woScPoNumber: "WO-2026-0456" },
+          data: { woScPoNumber: "DEMO-WO-002" },
         });
       }
     }
-    // Keep the REF-2 audit on-time (≤ tgl 10) for the Skor Auditor demo.
+    // Keep the demo audit on-time (≤ tgl 10) for the Skor Auditor demo.
     await db.audit.updateMany({
-      where: { areaId: ref2.id, period, status: "SUBMITTED" },
+      where: { areaId: demoArea.id, period, status: "SUBMITTED" },
       data: { submittedAt: new Date(`${period}-08T09:00:00`) },
     });
   }
 
-  // Daily Checklist items (24) — seed once.
-  if ((await db.checklistItem.count()) === 0) {
-    let order = 0;
-    for (const item of CHECKLIST_ITEMS) {
-      await db.checklistItem.create({ data: { ...item, order: order++ } });
-    }
+  // Synchronize the synthetic checklist by group+order so an existing demo DB
+  // is sanitized when the seed is re-run, without deleting user responses.
+  const checklistOrder = new Map<AreaGroup, number>();
+  for (const item of CHECKLIST_ITEMS) {
+    const order = checklistOrder.get(item.group) ?? 0;
+    await db.checklistItem.upsert({
+      where: { group_order: { group: item.group, order } },
+      update: { text: item.text, active: true },
+      create: { ...item, order },
+    });
+    checklistOrder.set(item.group, order + 1);
   }
 
-  // Sample Red Tags for REF-2 (varied urgency) — seed once. The first one is
-  // linked to the REF-2 "Material/Suku cadang" finding to show the CAPA→Red Tag
+  // Sample Red Tags for the demo area (varied urgency) — seed once. The first
+  // one is linked to a finding to show the CAPA -> Red Tag
   // flow (a Ringkas finding whose follow-up is to red-tag the item).
-  if (ref2 && (await db.redTag.count()) === 0) {
+  if (demoArea && (await db.redTag.count()) === 0) {
     const day = 1000 * 60 * 60 * 24;
     const now = Date.now();
     const year = new Date().getFullYear();
     const materialFinding = await db.finding.findFirst({
       where: {
-        audit: { areaId: ref2.id },
+        audit: { areaId: demoArea.id },
         guidingQuestion: { subCategory: "Material dan atau Suku cadang" },
       },
     });
     const seeds = [
       // approaching: registered 27 days ago, IN_AREA (30d) -> due in ~3 days
-      { name: "Motor pompa cadangan rusak", category: "Suku Cadang", reason: "Rusak, tidak dapat diperbaiki", location: "IN_AREA" as const, regAgo: 27, status: "OPEN" as const, findingId: materialFinding?.id ?? null },
+      { name: "Peralatan portabel rusak", category: "Peralatan", reason: "Rusak dan menunggu keputusan", location: "IN_AREA" as const, regAgo: 27, status: "OPEN" as const, findingId: materialFinding?.id ?? null },
       // overdue: registered 95 days ago, RT_AREA (90d) -> overdue ~5 days
-      { name: "Drum bekas pelarut", category: "Material", reason: "Tidak terpakai di proses saat ini", location: "RT_AREA" as const, regAgo: 95, status: "OPEN" as const, findingId: null },
+      { name: "Wadah kosong tidak terpakai", category: "Material", reason: "Tidak diperlukan pada kegiatan simulasi", location: "RT_AREA" as const, regAgo: 95, status: "OPEN" as const, findingId: null },
       // decided
-      { name: "Panel kontrol lama", category: "Peralatan / Tooling", reason: "Sudah diganti unit baru", location: "RT_AREA" as const, regAgo: 40, status: "DISPOSED" as const, findingId: null },
+      { name: "Papan informasi lama", category: "Peralatan", reason: "Sudah diganti dengan contoh baru", location: "RT_AREA" as const, regAgo: 40, status: "DISPOSED" as const, findingId: null },
     ];
     let seq = 1;
     for (const s of seeds) {
@@ -467,7 +488,7 @@ async function main() {
       await db.redTag.create({
         data: {
           tagNumber: `RT-${year}-${String(seq++).padStart(3, "0")}`,
-          areaId: ref2.id,
+          areaId: demoArea.id,
           findingId: s.findingId,
           name: s.name,
           category: s.category,
@@ -482,18 +503,18 @@ async function main() {
     }
   }
 
-  // Backfill (idempotent): link the "Motor pompa" red tag to the REF-2
-  // Material finding to demo the CAPA→Red Tag flow on already-seeded DBs.
-  if (ref2) {
+  // Backfill (idempotent): link one open red tag to the demo area's material
+  // finding to demonstrate the CAPA -> Red Tag flow on already-seeded DBs.
+  if (demoArea) {
     const materialFinding = await db.finding.findFirst({
       where: {
-        audit: { areaId: ref2.id },
+        audit: { areaId: demoArea.id },
         guidingQuestion: { subCategory: "Material dan atau Suku cadang" },
       },
     });
     if (materialFinding) {
       await db.redTag.updateMany({
-        where: { areaId: ref2.id, findingId: null, name: "Motor pompa cadangan rusak" },
+        where: { areaId: demoArea.id, findingId: null, status: "OPEN" },
         data: { findingId: materialFinding.id },
       });
     }
@@ -533,8 +554,8 @@ async function main() {
     await db.auditLog.createMany({
       data: [
         { action: "system.seed", entity: "System", summary: "Inisialisasi data master & seed.", userName: "Sistem", userEmail: "-" },
-        { action: "schedule.generate", entity: "AuditSchedule", summary: `Membuat jadwal audit periode ${period} untuk 12 area.`, userName: "Halim (Komite Unit)", userEmail: "komite@5r.local" },
-        { action: "audit.submit", entity: "Audit", summary: "Audit Refinery Lt 2 dikirim dengan 5 temuan.", userName: "Muhib (Auditor)", userEmail: "auditor1@5r.local" },
+        { action: "schedule.generate", entity: "AuditSchedule", summary: `Membuat jadwal audit demo periode ${period} untuk 12 area.`, userName: "Komite Demo", userEmail: "komite@5r.local" },
+        { action: "audit.submit", entity: "Audit", summary: "Audit Zona A - Lantai 2 dikirim dengan 5 temuan demo.", userName: "Auditor Demo 1", userEmail: "auditor1@5r.local" },
       ],
     });
   }

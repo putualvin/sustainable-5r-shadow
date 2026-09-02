@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
 import { fillCapa, type CapaActionState } from "@/lib/actions/capa";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ export function CapaForm({
   findingId: string;
   defaults: Defaults;
 }) {
-  const [state, formAction] = useFormState<CapaActionState, FormData>(
+  const [state, formAction] = useActionState<CapaActionState, FormData>(
     fillCapa,
     {}
   );
@@ -70,7 +71,7 @@ export function CapaForm({
             id="woScPoNumber"
             name="woScPoNumber"
             defaultValue={defaults.woScPoNumber}
-            placeholder="mis. WO-2026-0456"
+            placeholder="mis. DEMO-WO-003"
           />
           <p className="text-xs text-muted-foreground">
             Wajib bila Komite menetapkan status <strong>Progress</strong>.

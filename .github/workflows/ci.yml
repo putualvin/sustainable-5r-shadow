@@ -1,0 +1,51 @@
+name: Verify application
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Build does not connect to this host. It only gives Prisma/Next a valid
+      # URL shape while CI verifies that no database mutation runs at build time.
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/sustainable_5r_ci
+      APP_MODE: demo
+      NEXT_TELEMETRY_DISABLED: 1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify environment
+        run: npm run verify:env
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm run audit:production
+
+      - name: Production build
+        run: npm run build

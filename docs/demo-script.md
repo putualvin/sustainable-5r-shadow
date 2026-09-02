@@ -30,24 +30,25 @@ Satu **siklus audit bulanan** dijalankan berurutan, berpindah peran lewat tombol
 | # | Peran | Aksi | Yang harus terlihat (bukti sinkron) |
 |---|---|---|---|
 | 1 | **Komite** (`komite@5r.local`) | **Jadwal → Buat Jadwal** | 12 area dapat auditor (auditor tidak menilai areanya sendiri) |
-| 2 | **Auditor** (`auditor1@5r.local`) | **Audit → Mulai** sebuah area → **Tambah Temuan** (pilih 5R, sub‑kategori, **kategori Low/High**, deskripsi, foto, centang *berulang* bila perlu) | Kartu **Target Temuan X/21** naik; badge Low/High & Berulang muncul |
-| 3 | **Auditor** | **Kirim & Distribusikan** | Status **Terkirim**; temuan terdistribusi ke PIC area |
-| 4 | **Auditee/PIC** (`pic.ref-2@5r.local`) | Beranda → **Temuan Perlu Tindak Lanjut** → isi **root cause / korektif / preventif + No. WO/SC/PO** → Simpan | Temuan pindah ke **Menunggu Verifikasi**; KPI **CAPA Terbuka** turun |
-| 5 | *(opsional)* **Auditee** | Di halaman CAPA → **Daftarkan Red Tag** | Red Tag tertaut ke temuan; muncul di modul Red Tag |
-| 6 | **Komite** | Beranda → **Antrean Penilaian CAPA** → buka → tetapkan **Done / Progress / No Progress** (*Progress wajib No. WO*) | **Skor 5R area dihitung ulang** (2 lapis) seketika |
-| 7 | **Komite / Management** | **Skor 5R** → buka area | **Score Akhir = Nilai Utama − Temuan Berulang**; ada **Skor Auditor** |
-| 8 | **Management** (`gm@5r.local`) | **Laporan** | Dashboard: KPI, tren, pie per Level R, status temuan, skor per area, temuan berulang, analisa |
-| 9 | **Auditee** | **Checklist Harian** → isi item → Simpan | Skor harian + riwayat; KPI checklist update |
-| 10 | **Koord. Red Tag** (`redtag@5r.local`) | **Red Tag** → buka item → keputusan (Internal/Eksternal/Disposal) | Status berubah; KPI Red Tag Aktif turun |
-| 11 | **Admin** (`admin@5r.local`) | **Admin** → ubah peran / nonaktifkan user | Perubahan tercatat di **Log Aktivitas** |
+| 2 | **Auditor** (`auditor1@5r.local`) | **Audit → Mulai** sebuah area → tinjau daftar temuan bulan lalu beserta statusnya → tandai *Masih ada/Sudah ditangani* → **Tambah Temuan** (pilih 5R, sub-kategori, deskripsi, foto) | Riwayat menampilkan prioritas dan status Komite; temuan berulang dibuat otomatis; auditor tidak mengisi Low/High |
+| 3 | **Auditor** | **Kirim ke Komite Unit** | Status **Terkirim**; temuan masuk antrean penetapan prioritas Komite |
+| 4 | **Komite** (`komite@5r.local`) | Beranda → **Penetapan Prioritas Temuan** → buka audit → tetapkan **Low/High** per temuan | Temuan yang sudah diberi prioritas masuk antrean CAPA PIC area |
+| 5 | **Auditee/PIC Zona A2** (`pic.ref-2@5r.local`) | Beranda → **Temuan Perlu Tindak Lanjut** → isi **root cause / korektif / preventif + No. WO/SC/PO demo** → Simpan | Temuan pindah ke **Menunggu Verifikasi**; KPI **CAPA Terbuka** turun |
+| 6 | *(opsional)* **Auditee** | Di halaman CAPA → **Daftarkan Red Tag** | Red Tag tertaut ke temuan; muncul di modul Red Tag |
+| 7 | **Komite** | Beranda → **Antrean Penilaian CAPA** → buka → tetapkan **Done / Progress / No Progress** (*Progress wajib No. WO*) | **Skor 5R area dihitung ulang** (2 lapis) seketika |
+| 8 | **Komite / Management** | **Skor 5R** → buka area | **Score Akhir = Nilai Utama − Temuan Berulang**; ada **Skor Auditor** |
+| 9 | **Management** (`gm@5r.local`) | **Laporan** | Dashboard: KPI, tren, pie per Level R, status temuan, skor per area, temuan berulang, analisa |
+| 10 | **Auditee** | **Checklist Harian** → isi item → Simpan | Skor harian + riwayat; KPI checklist update |
+| 11 | **Koord. Red Tag** (`redtag@5r.local`) | **Red Tag** → buka item → keputusan (Internal/Eksternal/Disposal) | Status berubah; KPI Red Tag Aktif turun |
+| 12 | **Admin** (`admin@5r.local`) | **Admin** → ubah peran / nonaktifkan user | Perubahan tercatat di **Log Aktivitas** |
 
 **Inti yang dibuktikan:** setiap input/edit langsung tersinkron ke semua tampilan (beranda antrean, KPI, skor, laporan) lintas peran — tanpa refresh manual.
 
 ### Pengujian aturan terkunci (§5) yang bisa dicoba langsung
-- **Auditor tidak menetapkan status** — di form auditor tidak ada Done/Progress.
+- **Auditor tidak menetapkan prioritas atau status** — di form auditor tidak ada Low/High maupun Done/Progress.
 - **Progress wajib No. WO/SC/PO** — coba set Progress tanpa WO → ditolak.
 - **Cut‑off 17.00 WIB** — isi CAPA setelah jam 17.00 WIB → ditolak.
-- **No self‑audit** — auditor multi‑peran (`pic.fra-1@5r.local`) tak pernah dijadwalkan ke areanya.
+- **No self‑audit** — auditor multi‑peran (`pic.fra-1@5r.local`) tak pernah dijadwalkan ke Zona B1, yang menjadi areanya sendiri.
 - **Daily Checklist & Red Tag tidak masuk Score Akhir.**
 
 ---

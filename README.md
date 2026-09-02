@@ -8,18 +8,20 @@ A working web/mobile-responsive POC of the 5R audit system. Used for stakeholder
 
 ## Tech stack
 
-- **Next.js 14** (App Router) + TypeScript
+- **Next.js 16** (App Router) + React 19 + TypeScript
 - **Tailwind CSS** + **shadcn/ui**
-- **SQLite** + **Prisma**
+- **PostgreSQL (Neon)** + **Prisma**
 - **Vitest** for tests, **Playwright** for E2E (optional)
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - npm (comes with Node)
+- PostgreSQL/Neon connection string
 - A terminal (Mac Terminal / iTerm2 / Windows Terminal)
 
-That's it. No Docker, no Postgres, no cloud services for shadow build.
+The public demo uses only dummy data. Do not connect this repository to a
+database containing company or production data.
 
 ## Quick start
 
@@ -32,11 +34,11 @@ cd ~/dev   # or wherever you keep code
 npm install
 
 # 3. Set up environment
-cp .env.example .env
+cp .env.example .env.local
+# Replace DATABASE_URL with the demo Neon connection string.
 
-# 4. Set up the database (creates SQLite file + seeds data)
-npx prisma migrate dev --name init
-npm run db:seed
+# 4. Set up the demo database (run once, never during every build)
+npm run db:setup:demo
 
 # 5. Run the dev server
 npm run dev
@@ -56,7 +58,7 @@ Login email determines the role you sign in as:
 | `redtag@...` | Koordinator Red Tag |
 | `gm@...` | Management |
 
-Examples: `auditor1@5r.local`, `pic.refinery2@5r.local`, `gm@5r.local`. Any password works.
+Examples: `auditor1@5r.local`, `pic.ref-2@5r.local`, `gm@5r.local`. Any password works.
 
 ## Available scripts
 
@@ -67,11 +69,26 @@ Examples: `auditor1@5r.local`, `pic.refinery2@5r.local`, `gm@5r.local`. Any pass
 | `npm run start` | Run production build |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | Type-check without building |
+| `npm run check` | Lint + type-check + unit tests |
+| `npm run audit:production` | Audit deployable runtime dependencies |
+| `npm run verify:deploy` | Validate env + run all pre-deploy checks |
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Vitest watch mode |
+| `npm run db:setup:demo` | Sync schema safely and seed dummy data |
 | `npm run db:seed` | Re-seed the database |
-| `npm run db:reset` | Drop, migrate, and re-seed |
-| `npm run db:studio` | Open Prisma Studio (visual DB browser at localhost:5555) |
+
+## Deploy to Vercel
+
+The repository is configured for Vercel's standard Next.js Git deployment.
+There is deliberately no database mutation in the build command.
+
+1. Prepare Neon once with `npm run db:setup:demo`.
+2. Import this GitHub repository into Vercel.
+3. Add `DATABASE_URL` and `APP_MODE=demo` to Production and Preview.
+4. Keep the framework preset and build command on their automatic defaults.
+5. Verify `/api/health` returns `status: ok` after deployment.
+
+See [`docs/deploy-vercel.md`](docs/deploy-vercel.md) for the full checklist.
 
 ## Project structure
 
@@ -100,8 +117,8 @@ See `docs/roadmap.md` for the build order.
 
 1. `npm run typecheck` — most issues are types
 2. `npm run lint`
-3. `rm -rf .next && npm run dev` — clears Next's cache
-4. `npm run db:reset` — nuclear option, but resets the DB to clean seed
+3. Clear the `.next` directory, then run `npm run dev` again
+4. Run `npm run db:setup:demo` only when the demo schema or seed needs repair
 5. Ask Claude Code: *"X is broken, here's the error: [paste]. Diagnose, propose a fix, wait for my OK."*
 
 ## Important reminders

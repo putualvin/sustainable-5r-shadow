@@ -14,11 +14,12 @@ function todayStr(): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-export default async function ChecklistPage({
-  searchParams,
-}: {
-  searchParams: { shift?: string; saved?: string };
-}) {
+export default async function ChecklistPage(
+  props: {
+    searchParams: Promise<{ shift?: string; saved?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user) return null;
 

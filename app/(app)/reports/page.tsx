@@ -89,7 +89,7 @@ export default async function ReportsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Sustainable 5R — Dashboard Laporan</h1>
-          <p className="text-sm text-muted-foreground">Periode {formatPeriod(period)} · Unit Refinery 2</p>
+          <p className="text-sm text-muted-foreground">Periode {formatPeriod(period)} · Fasilitas Demo</p>
         </div>
         <PrintButton />
       </div>

@@ -26,11 +26,12 @@ const STATUS = {
   SUBMITTED: { label: "Terkirim", cls: "bg-success/10 text-success" },
 } as const;
 
-export default async function SchedulePage({
-  searchParams,
-}: {
-  searchParams: { period?: string; error?: string };
-}) {
+export default async function SchedulePage(
+  props: {
+    searchParams: Promise<{ period?: string; error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user) return null;
 

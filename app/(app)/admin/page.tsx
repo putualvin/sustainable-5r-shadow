@@ -16,11 +16,12 @@ const ERRORS: Record<string, string> = {
     "Komite Unit bersifat independen — peran ini tidak boleh digabung dengan peran lain.",
 };
 
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: { error?: string };
-}) {
+export default async function AdminPage(
+  props: {
+    searchParams: Promise<{ error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user) return null;
 

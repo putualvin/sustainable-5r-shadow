@@ -15,6 +15,32 @@ Format:
 
 ---
 
+## 2026-09-02 — Auditor reviews last month; Komite Unit owns Low/High priority
+
+**Context:** The monthly audit must start with visibility of the same area's
+previous-month findings, including the follow-up status decided by Komite Unit.
+Low/High is a business priority decision by Komite Unit, not an auditor input.
+
+**Decision:**
+1. The audit detail shows last month's findings before the new-finding form,
+   including priority, CAPA status (`Done`, `Progress`, `No Progress`),
+   WO/SC/PO, and an automatic `Parking Lot` flag after an unfinished CAPA's due
+   date.
+2. The auditor records objective finding data only. Manual Low/High and manual
+   recurring checkboxes were removed; recurring findings are created from the
+   previous-month review.
+3. Submitting an audit moves findings to `PENDING_PRIORITY`. Komite Unit/admin
+   assigns Low/High on the submitted audit; only then does a finding move to
+   `PENDING_CAPA` and become available to the area's PIC.
+4. `Finding.kategori` remains the physical column name for compatibility but is
+   nullable and semantically represents priority.
+
+**Consequences:** Existing databases require a Prisma schema sync. The CAPA
+inbox and home page now include a Komite priority queue, and unprioritized
+findings are never exposed to the PIC CAPA form.
+
+---
+
 ## 2026-06-15 — Initial stack choice: Next.js + SQLite + Prisma
 
 **Context:** Shadow build for a 5R audit application. Single developer. Demo-focused. Must run on a personal laptop without infrastructure setup.
@@ -61,7 +87,7 @@ Format:
 
 **Context:** Initial drafts of the BRD and early planning treated "guiding questions" as a single concept and conflated Audit findings with Daily Checklist items. Two source documents clarify they are different:
 - `v0_Guiding_Questions.xlsx` — 27 sub-categories across 5 R principles, used by Auditors during monthly cross-area audits.
-- `Application_Documentation.pdf` (AppSheet) — 14 Refinery items + 10 Fractionation items, used by PIC Areas as daily self-checks per shift.
+- Public demo seed — 14 synthetic Zone A items + 10 synthetic Zone B items, used by PIC Areas as daily self-checks per shift.
 
 **Options considered:**
 - Merge into one question bank with a tag for context — rejected; the two flows have different actors, frequencies, and outcomes; merging would force artificial alignment.
@@ -73,7 +99,7 @@ Format:
 
 **Consequences:** 
 - Two separate Prisma models: `GuidingQuestion` (for audit findings) and `ChecklistItem` (for daily checklist).
-- Seed includes 27 guiding questions and 24 checklist items (14 Refinery + 10 Fractionation). Other areas have no items yet — committee needs to define them.
+- Seed includes 27 generic guiding questions and 24 synthetic checklist items (14 Zone A + 10 Zone B). Other areas have no items yet — committee needs to define them.
 - This closes Open Question OQ-03 in BRD v3.0 (format of guiding questions) — the format is the dropdown bertingkat already defined in the Guidelines.
 
 ---
@@ -118,9 +144,9 @@ Format:
 **Decisions:**
 1. **`Capa` is 1:1 with `Finding`** (`findingId @unique`). Fields: rootCause, correctiveAction, preventiveAction (two separate text fields), single `afterPhoto` (rule 4), dueDate, status `DONE|PROGRESS|NO_PROGRESS`. No dispute step (rule 3).
 2. **Score recompute counts only findings that HAVE a CAPA** for the area+period; findings still `PENDING_CAPA` are "not yet evaluated" and excluded. `recomputeAreaScore()` calls the one `calculate5RScore()` engine and upserts `Score`. Runs on every CAPA save.
-3. **Seeded scores stay for areas without CAPA.** Recompute only overwrites the area being acted on, so the overview shows seeded baselines plus live-computed values. (Verified: REF-2 went 95%→33% after 1 Done/1 Progress/1 No Progress.)
+3. **Seeded scores stay for areas without CAPA.** Recompute only overwrites the area being acted on, so the overview shows seeded baselines plus live-computed values. (Verified on the primary demo area after 1 Done/1 Progress/1 No Progress.)
 4. **`scores` section excluded from auditee RBAC** — PIC fills CAPA but views scores via komite/management/auditor/admin. PIC verifying their own score isn't part of the flow.
-5. **Seed adds a submitted REF-2 audit + 5 findings** so the PIC has a CAPA inbox out of the box.
+5. **Seed adds a submitted audit + 5 synthetic findings** so the primary demo PIC has a CAPA inbox out of the box.
 
 **Rationale:** Make the scoring loop demonstrable and correct, with the formula in exactly one place.
 
@@ -133,7 +159,7 @@ Format:
 **Context:** Daily self-check per shift by the area PIC. Rule 6: completely separate from Audit.
 
 **Decisions:**
-1. **Separate models** `ChecklistItem` / `ChecklistRun` / `ChecklistResponse` — no shared tables or questions with audit. Items scoped to parent `AreaGroup` (Refinery/Fractionation); each floor inherits its group's items. Seeded 14 Refinery + 10 Fractionation verbatim.
+1. **Separate models** `ChecklistItem` / `ChecklistRun` / `ChecklistResponse` — no shared tables or questions with audit. Items are scoped to a synthetic parent `AreaGroup`; each floor inherits its group's generic checklist.
 2. **Run keyed by `(areaId, date, shift)`** (unique). Re-submitting upserts the run and replaces its responses. Score = round(% compliant). Warning shown when score < 90% (threshold from CLAUDE.md).
 3. **Per-item optional note + photo** only when "Tidak Sesuai" (revealed client-side); photos saved via the same `savePhoto` helper.
 4. **History = simple list** (date · shift · score). The month-calendar view in the roadmap is "nice to have" and deferred.
@@ -170,7 +196,7 @@ Format:
 **Decisions:**
 1. **No schema change.** The report aggregates existing `Score`, `Finding`, and `Audit` rows. RBAC is unchanged — `reports` is already scoped to `komite_unit`/`management`/`admin` in `SECTION_ACCESS`.
 2. **Aggregation helpers are pure** in `lib/reports.ts` (`averageScore`, `totalCapaStatuses`, `findingsByPillar`, `recurringFindings`) with unit tests (`lib/reports.test.ts`). The page (`app/(app)/reports/page.tsx`) is a Server Component doing direct Prisma reads, then delegating math to those helpers — no scoring math inlined (rule 1).
-3. **Compliance donut + per-area table are driven by `Score`** (rich, all 12 areas), while the category bar and recurring panel are driven by `Finding` rows for the current period's submitted audits (sparse but real — only seeded REF-2 has findings). Honest empty states where data is thin.
+3. **Compliance donut + per-area table are driven by `Score`** (rich, all 12 areas), while the category bar and recurring panel are driven by synthetic `Finding` rows for the current period's submitted audits. Honest empty states are used where data is thin.
 4. **Seeded 2 prior months of `Score`** (idempotent upsert, `periodMonthsAgo`) so the trend line and "vs last month" deltas render meaningfully. Older months trend slightly lower → gentle upward trend.
 5. **Print to PDF** reuses the existing `PrintButton` (`window.print()`); chart/cards print as laid out.
 6. **Home KPIs wired up** — the stale "Segera (Module 3/4/5)" placeholders now show real counts: open CAPA (findings PENDING_CAPA not yet Done), active Red Tags (status OPEN), and average Daily Checklist compliance this period.
@@ -190,7 +216,7 @@ Format:
 **Rationale:** Runs the DB sync where the DB is reachable. The seed is idempotent (upserts + count guards), so re-running on each deploy is safe.
 
 **Consequences:**
-- Every production deploy re-syncs the schema and re-runs the seed. Seeded rows (areas/users/scores) are re-upserted, so a redeploy resets seeded scores (e.g. a recomputed REF-2 score returns to its seed tally). User-created rows (findings/CAPA/checklist runs/red tags beyond seeds) are NOT deleted. Fine for a demo; if a deploy must preserve live edits, drop `tsx prisma/seed.ts` from the build command first.
+- Historical note: the old deployment once re-synced schema and seed during every build. This is no longer allowed; database setup now runs manually through `npm run db:setup:demo`.
 - Mock auth means the URL is a **public demo** — anyone with the link can log in as any role. Not for sensitive data.
 
 ---
@@ -207,7 +233,53 @@ Format:
 
 **Rationale:** Maximise coverage of the roadmap at shadow-build depth without touching the documented business rules (scoring/RBAC rules unchanged; role *data* is editable, the access *map* is not).
 
-**Consequences:** New tables (`Document`, `AuditLog`) are created by the deploy's `prisma db push`. The seeded REF-2 audit has no `scheduleId`, so it shows as "Belum mulai" on the schedule grid (status there is keyed by schedule-linked audits) — cosmetic only.
+**Consequences:** New tables (`Document`, `AuditLog`) are created by the manual demo database setup. The seeded audit has no `scheduleId`, so it can show as "Belum mulai" on the schedule grid — cosmetic only.
+
+---
+
+## 2026-09-02 — Hardened public Vercel demo deployment
+
+**Context:** The repository remains public and the application is hosted on
+Vercel as a dummy-data demonstration. Azure is deferred until an approved
+pilot. The previous Vercel build command ran `prisma db push
+--accept-data-loss` and the seed on every build, including preview builds.
+
+**Decisions:**
+1. Remove the custom Vercel build command. Vercel uses the standard Next.js
+   build and never mutates the database during a deployment.
+2. Database setup is an explicit one-time operator action via
+   `npm run db:setup:demo`. The command does not allow destructive schema
+   changes automatically.
+3. `APP_MODE=demo` is required to enable mock authentication. Production-mode
+   deployments fail closed and display an enterprise-authentication notice.
+4. Add a persistent public-demo banner, a database-aware `/api/health`
+   endpoint, and GitHub CI for lint, type-check, unit tests, and production
+   build.
+5. Disable automatic Azure deployment from `main`; preserve it as a manual
+   workflow for later pilot work.
+
+**Consequences:** A fresh database requires one manual setup step before the
+first deployment. This is intentional: Git preview builds can no longer alter
+or reset the shared demo database. Mock authentication remains acceptable only
+for dummy public data and must be replaced for pilot.
+
+---
+
+## 2026-09-02 — Next.js 16 security upgrade
+
+**Context:** A production dependency audit found multiple high-severity
+advisories affecting the unsupported Next.js 14 line. No safe patch was
+available within the same major version for a public deployment.
+
+**Decision:** Upgrade to Next.js 16.3.4, React 19.2, and Node.js 24. Apply the
+official request-API, proxy, React 19, and ESLint codemods. Keep business rules,
+Prisma schema, and UI behavior unchanged. Add a production-only dependency
+audit to CI and the local deployment verification command.
+
+**Consequences:** `cookies`, route `params`, and `searchParams` are asynchronous;
+`middleware.ts` is now `proxy.ts`; `next lint` is replaced by the ESLint CLI.
+Production build uses Turbopack. The runtime dependency audit reports zero
+known vulnerabilities at the configured high-severity threshold.
 
 ---
 
@@ -236,7 +308,7 @@ Format:
 3. **Edge middleware** can't query the DB, so roles are written to a `session_roles` cookie at login (resolved from the DB user, or the email prefix for virtual users). `getCurrentUser` remains DB-authoritative; middleware is the coarse gate. Trade-off: an admin changing someone's roles is reflected in middleware only after that user re-logs in — but the page layer (DB) is authoritative, so it can't grant more than allowed.
 4. **Conflict of interest:** `generateSchedule`/`shuffleSchedule` never assign an auditor to audit their own area (`auditor.areaId === area.id` is skipped).
 5. **Admin UI:** single-role `<select>` → multi-select chips (`RolesSelect`) calling `setUserRoles`. Self-lockout guard now checks the *resulting set* still includes `admin`.
-6. **Demo:** PIC Fraksinasi Lt 1 (`pic.fra-1@5r.local`) holds `[auditee, auditor]` to showcase multi-role.
+6. **Demo:** PIC Zona B1 (`pic.fra-1@5r.local`) holds `[auditee, auditor]` to showcase multi-role.
 
 **Consequences:**
 - Requires PostgreSQL (enum arrays aren't supported on SQLite), so the local SQLite preview path no longer applies to this feature — verification is via unit tests (RBAC, no DB) + build + the live Neon deploy.
@@ -257,7 +329,7 @@ Format:
 5. **Lock after verification:** once Komite verifies, the auditee can no longer edit that CAPA (`fillCapa` rejects an edit when `status != null`); the detail page shows it read-only. (Per the owner: a verified CAPA isn't edited; scoring stands on it.)
 6. **Inbox** is role-aware: auditee sees *Perlu Diisi / Menunggu Verifikasi / Terverifikasi*; Komite sees a *Menunggu Verifikasi* action queue + *Terverifikasi* + *Belum Diisi Auditee*.
 
-**Consequences:** Recompute is now triggered by Komite verification (not auditee save) — matching the real workflow. Seed gives REF-2 two filled-but-unverified CAPAs so the Komite queue is non-empty. This realises the "Komite verify CAPA" step previously deferred in the Module 3 note.
+**Consequences:** Recompute is now triggered by Komite verification (not auditee save). Seed gives the primary demo area two filled-but-unverified CAPAs so the Komite queue is non-empty.
 
 ---
 
@@ -270,7 +342,7 @@ Format:
 - The CAPA detail lists linked red tags (number + status); the Red Tag detail links back to its source finding.
 - `createRedTag` anchors the area to the finding's area when raised from a finding (consistency). Auditees may only raise from a finding in their own area.
 
-**Consequences:** Scoring is untouched — the link is informational/navigational. Seed links one REF-2 red tag to the "Material/Suku cadang" finding to demo the flow.
+**Consequences:** Scoring is untouched — the link is informational/navigational. Seed links one synthetic red tag to the material finding to demo the flow.
 
 ---
 
@@ -302,7 +374,7 @@ Format:
 - `Capa.woScPoNumber` added. Auditee enters it in the CAPA form (optional in general). **Komite cannot set status Progress unless the CAPA has a WO/SC/PO number** (`verifyCapa` blocks → `?error=wo-required`); the verify card warns when it's missing.
 - **Follow-up limit 25/area/month:** `fillCapa` blocks creating a NEW CAPA once the area already has 25 CAPAs for the period (editing existing is always allowed).
 - **Cut-off 17.00 WIB:** `fillCapa` rejects after 17:00 Asia/Jakarta (deploy runs UTC, so hour is derived in WIB). Note: a demo run after 17:00 WIB will see the auditee fill blocked — by design.
-- Seed: REF-2 CAPA #1 has WO-2026-0456 (Komite can set Progress); CAPA #2 has none (Progress blocked until filled).
+- Seed: demo CAPA #1 has a synthetic WO number (Komite can set Progress); CAPA #2 has none (Progress blocked until filled).
 
 ---
 

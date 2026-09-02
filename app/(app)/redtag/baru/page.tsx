@@ -9,11 +9,12 @@ import { PILLAR_LABEL } from "@/lib/pillars";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RedTagForm } from "@/components/forms/redtag-form";
 
-export default async function RedTagNewPage({
-  searchParams,
-}: {
-  searchParams: { findingId?: string };
-}) {
+export default async function RedTagNewPage(
+  props: {
+    searchParams: Promise<{ findingId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user || !canAccess(user.roles, "redtag")) redirect("/403");
 

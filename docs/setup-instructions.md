@@ -1,5 +1,8 @@
 # Setup Instructions — Start Here
 
+> **Catatan:** bagian scaffolding di dokumen ini bersifat historis. Untuk
+> menjalankan repository yang sekarang (PostgreSQL/Neon), ikuti `README.md`.
+
 Steps to get from "nothing" to "working dev server with Claude Code ready to build". Should take 30-45 minutes the first time.
 
 ## Prerequisites check
@@ -7,7 +10,7 @@ Steps to get from "nothing" to "working dev server with Claude Code ready to bui
 Open Terminal and run these. If any fail, install that thing first.
 
 ```bash
-node --version    # should be v20.x or higher
+node --version    # should be v24.x or higher
 npm --version     # should be 10.x or higher
 git --version     # any recent version
 claude --version  # should show Claude Code version
@@ -61,10 +64,10 @@ When Claude Code opens, send this exact message:
 > Then scaffold Module 0 (Foundation) from the roadmap. Before writing code, give me a 5-8 bullet plan and the list of dependencies you'll install. Wait for my "go".
 
 Review the plan. It should mention:
-- Initialising Next.js 14 with TypeScript + Tailwind + App Router
+- Initialising Next.js with TypeScript + Tailwind + App Router
 - Installing the dependencies listed in CLAUDE.md (Prisma, shadcn/ui, lucide-react, recharts, qrcode.react, react-hook-form, zod, date-fns, zustand)
 - Setting up the folder structure (app/, components/, lib/, prisma/, types/)
-- Configuring Tailwind theme with Sinar Mas brand colors
+- Configuring the neutral public-demo Tailwind theme
 - Creating the Prisma schema for User + Area
 - Setting up mock auth (login route, middleware, session cookie)
 - Building the app shell (sidebar / bottom nav)
@@ -80,9 +83,8 @@ After Claude Code finishes Module 0:
 # Install dependencies (Claude should have run this, but to be safe)
 npm install
 
-# Set up the database
-npx prisma migrate dev --name init
-npm run db:seed
+# Configure .env.local with a dummy Neon DATABASE_URL, then set up the database
+npm run db:setup:demo
 
 # Start the dev server
 npm run dev
@@ -90,7 +92,7 @@ npm run dev
 
 Open http://localhost:3000.
 
-**You should see:** a login page. Try logging in with `auditor1@5r.local` (any password). You should land on a home page that says "Halo, [name]" or similar, with a sidebar/menu reflecting the auditor role.
+**You should see:** a login page. Try logging in with `auditor1@5r.local` (any password). You should land on a home page that says "Halo, [name]" or similar, with a sidebar/menu reflecting the auditor role. Use dummy data only.
 
 If something is broken: paste the error to Claude Code and ask it to diagnose.
 
@@ -131,8 +133,9 @@ Common issues:
 **`npm install` fails with EACCES or permission errors:**
 You probably need to fix npm permissions. See https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally
 
-**Prisma can't find SQLite:**
-Make sure `.env` has `DATABASE_URL="file:./dev.db"` (Claude should have created this).
+**Prisma cannot connect to PostgreSQL:**
+Make sure `.env.local` contains a valid Neon `DATABASE_URL`, then run
+`npm run verify:env`. Never use a company or production database for this demo.
 
 **Next.js port 3000 already in use:**
 Either kill the other process (`lsof -ti:3000 | xargs kill`) or run `npm run dev -- -p 3001`.

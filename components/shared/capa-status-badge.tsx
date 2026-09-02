@@ -1,9 +1,9 @@
 import type { CapaStatus } from "@prisma/client";
 
 const MAP: Record<CapaStatus, { label: string; cls: string }> = {
-  DONE: { label: "Selesai", cls: "bg-success/10 text-success" },
-  PROGRESS: { label: "Proses", cls: "bg-info/10 text-info" },
-  NO_PROGRESS: { label: "Belum Ada", cls: "bg-danger/10 text-danger" },
+  DONE: { label: "Done", cls: "bg-success/10 text-success" },
+  PROGRESS: { label: "Progress", cls: "bg-info/10 text-info" },
+  NO_PROGRESS: { label: "No Progress", cls: "bg-danger/10 text-danger" },
 };
 
 export function CapaStatusBadge({ status }: { status: CapaStatus }) {
@@ -18,7 +18,7 @@ export function CapaStatusBadge({ status }: { status: CapaStatus }) {
 }
 
 export const CAPA_STATUS_OPTIONS: { value: CapaStatus; label: string }[] = [
-  { value: "DONE", label: "Selesai (Done)" },
-  { value: "PROGRESS", label: "Proses (Progress)" },
-  { value: "NO_PROGRESS", label: "Belum Ada (No Progress)" },
+  { value: "DONE", label: "Done" },
+  { value: "PROGRESS", label: "Progress" },
+  { value: "NO_PROGRESS", label: "No Progress" },
 ];

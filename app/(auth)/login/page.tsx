@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LoginForm } from "@/components/forms/login-form";
+import { appConfig } from "@/lib/app-config";
 
 export default function LoginPage() {
   return (
@@ -19,19 +20,28 @@ export default function LoginPage() {
             Sustainable 5R
           </h1>
           <p className="text-sm text-muted-foreground">
-            Sinar Mas Agribusiness and Food
+            Fasilitas Demonstrasi
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Masuk</CardTitle>
+            <CardTitle>{appConfig.isDemo ? "Masuk Demo" : "Login Belum Tersedia"}</CardTitle>
             <CardDescription>
-              Gunakan email perusahaan Anda untuk masuk.
+              {appConfig.isDemo
+                ? "Pilih akun dummy untuk menjelajahi fitur berdasarkan peran."
+                : "Autentikasi enterprise wajib dikonfigurasi sebelum aplikasi digunakan sebagai pilot."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LoginForm />
+            {appConfig.isDemo ? (
+              <LoginForm />
+            ) : (
+              <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+                Deployment ini tidak mengaktifkan mock login. Hubungi pengelola
+                aplikasi untuk konfigurasi Microsoft Entra ID.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

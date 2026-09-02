@@ -11,11 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CapaPie, ScoreTrend } from "@/components/shared/score-charts";
 import { PrintButton } from "@/components/shared/print-button";
 
-export default async function ScoreDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function ScoreDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const user = await getCurrentUser();
   if (!user || !canAccess(user.roles, "scores")) redirect("/403");
 

@@ -97,6 +97,7 @@ export default async function HomePage() {
 
   // ---- Role-specific work queues ----
   const [
+    komitePriorityQueue,
     komiteQueue,
     auditeeFindings,
     checklistTodayRun,
@@ -105,6 +106,14 @@ export default async function HomePage() {
     auditorAudits,
     mgmtScores,
   ] = await Promise.all([
+    isKomite
+      ? db.finding.findMany({
+          where: { status: "PENDING_PRIORITY", audit: { status: "SUBMITTED" } },
+          include: { guidingQuestion: true, audit: { include: { area: true } } },
+          orderBy: { createdAt: "asc" },
+          take: 6,
+        })
+      : Promise.resolve([]),
     isKomite
       ? db.finding.findMany({
           where: { capa: { is: { status: null } }, audit: { status: "SUBMITTED" } },
@@ -171,6 +180,29 @@ export default async function HomePage() {
       )}
 
       {/* ===== Antrean kerja per peran ===== */}
+
+      {/* Komite: prioritas temuan harus selesai sebelum masuk antrean PIC. */}
+      {isKomite && (
+        <Queue
+          icon={ShieldCheck}
+          tone="warning"
+          title="Penetapan Prioritas Temuan"
+          subtitle="Tentukan Low/High sebelum temuan diteruskan ke PIC"
+          href="/capa"
+          count={komitePriorityQueue.length}
+          empty="Semua temuan sudah memiliki prioritas."
+        >
+          {komitePriorityQueue.map((f) => (
+            <Row
+              key={f.id}
+              href={`/audit/${f.audit.id}#finding-${f.id}`}
+              title={f.guidingQuestion.subCategory}
+              sub={f.audit.area.name}
+              badge={<Tag2 cls="bg-warning/10 text-warning">Pilih Low/High</Tag2>}
+            />
+          ))}
+        </Queue>
+      )}
 
       {/* Komite: antrean penilaian CAPA */}
       {isKomite && (

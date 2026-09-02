@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 import type { Pillar } from "@prisma/client";
 
 import { addFinding, type FindingActionState } from "@/lib/actions/audit";
@@ -27,16 +28,12 @@ type Draft = {
   gqId: string;
   locationDetail: string;
   description: string;
-  kategori: "LOW" | "HIGH" | "";
-  isRecurring: boolean;
 };
 const EMPTY: Draft = {
   pillar: "",
   gqId: "",
   locationDetail: "",
   description: "",
-  kategori: "",
-  isRecurring: false,
 };
 
 const selectClass =
@@ -49,7 +46,7 @@ export function AddFindingForm({
   auditId: string;
   guidingQuestions: GQ[];
 }) {
-  const [state, formAction] = useFormState<FindingActionState, FormData>(
+  const [state, formAction] = useActionState<FindingActionState, FormData>(
     addFinding,
     {}
   );
@@ -67,12 +64,19 @@ export function AddFindingForm({
 
   // Clear the draft after a successful add so the next finding starts fresh.
   useEffect(() => {
-    if (state?.ok) {
+    if (!state?.ok) return;
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
       setDraft(EMPTY);
       setPhotoKey((k) => k + 1);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state, setDraft]);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -131,7 +135,7 @@ export function AddFindingForm({
         <Input
           id="locationDetail"
           name="locationDetail"
-          placeholder="mis. dekat pompa P-101"
+          placeholder="mis. dekat stasiun kerja A"
           value={draft.locationDetail}
           onChange={(e) =>
             setDraft((d) => ({ ...d, locationDetail: e.target.value }))
@@ -152,38 +156,11 @@ export function AddFindingForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="kategori">Kategori temuan</Label>
-          <select
-            id="kategori"
-            name="kategori"
-            className={selectClass}
-            value={draft.kategori}
-            onChange={(e) =>
-              setDraft((d) => ({ ...d, kategori: e.target.value as "LOW" | "HIGH" }))
-            }
-          >
-            <option value="">Pilih kategori…</option>
-            <option value="LOW">Low</option>
-            <option value="HIGH">High</option>
-          </select>
-        </div>
-        <div className="flex items-end">
-          <label className="flex h-11 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
-            <input
-              type="checkbox"
-              name="isRecurring"
-              checked={draft.isRecurring}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, isRecurring: e.target.checked }))
-              }
-              className="h-4 w-4"
-            />
-            Temuan berulang (bulan lalu &amp; ini)
-          </label>
-        </div>
-      </div>
+      <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+        Prioritas <strong>Low/High</strong> ditetapkan oleh Komite Unit setelah
+        audit dikirim. Temuan berulang dibuat melalui verifikasi daftar bulan
+        sebelumnya, bukan ditandai manual di formulir ini.
+      </p>
 
       <div className="space-y-2">
         <Label>Foto (opsional)</Label>

@@ -18,11 +18,12 @@ import { Button } from "@/components/ui/button";
 import { QrCode } from "@/components/shared/qr-code";
 import { cn } from "@/lib/utils";
 
-export default async function RedTagDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function RedTagDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const user = await getCurrentUser();
   if (!user || !canAccess(user.roles, "redtag")) redirect("/403");
 

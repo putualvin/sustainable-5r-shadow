@@ -6,14 +6,14 @@ import { Repeat, Check } from "lucide-react";
 import { switchRole } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
-// Demo accounts to switch between (mock auth). Email prefix → role; the FRA-1
+// Demo accounts to switch between (mock auth). Email prefix → role; one Zone B
 // PIC is multi-role (Auditee + Auditor).
 const ACCOUNTS = [
   { email: "admin@5r.local", label: "Admin" },
   { email: "komite@5r.local", label: "Komite Unit" },
   { email: "auditor1@5r.local", label: "Auditor" },
-  { email: "pic.ref-2@5r.local", label: "Auditee / PIC (Ref Lt 2)" },
-  { email: "pic.fra-1@5r.local", label: "Auditor + PIC (Frak Lt 1)" },
+  { email: "pic.ref-2@5r.local", label: "Auditee / PIC (Zona A2)" },
+  { email: "pic.fra-1@5r.local", label: "Auditor + PIC (Zona B1)" },
   { email: "redtag@5r.local", label: "Koord. Red Tag" },
   { email: "gm@5r.local", label: "Management" },
 ];

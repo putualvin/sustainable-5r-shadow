@@ -9,11 +9,12 @@ import { PILLAR_LABEL } from "@/lib/pillars";
 import { Card } from "@/components/ui/card";
 import { CapaStatusBadge } from "@/components/shared/capa-status-badge";
 
-export default async function CapaInboxPage({
-  searchParams,
-}: {
-  searchParams: { saved?: string };
-}) {
+export default async function CapaInboxPage(
+  props: {
+    searchParams: Promise<{ saved?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user) return null;
 
@@ -35,9 +36,11 @@ export default async function CapaInboxPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const pending = findings.filter((f) => !f.capa); // auditee belum mengisi
-  const awaiting = findings.filter((f) => f.capa && !f.capa.status); // menunggu verifikasi
-  const verified = findings.filter((f) => f.capa && f.capa.status); // sudah diverifikasi
+  const priorityPending = findings.filter((f) => !f.kategori);
+  const assigned = findings.filter((f) => Boolean(f.kategori));
+  const pending = assigned.filter((f) => !f.capa); // auditee belum mengisi
+  const awaiting = assigned.filter((f) => f.capa && !f.capa.status); // menunggu verifikasi
+  const verified = assigned.filter((f) => f.capa && f.capa.status); // sudah diverifikasi
 
   return (
     <div className="max-w-6xl space-y-6">
@@ -45,7 +48,7 @@ export default async function CapaInboxPage({
         <h1 className="text-2xl font-bold tracking-tight">CAPA</h1>
         <p className="text-sm text-muted-foreground">
           {isKomite
-            ? "Verifikasi tindak lanjut temuan audit dan tetapkan statusnya."
+            ? "Tetapkan prioritas temuan, lalu verifikasi tindak lanjut dan status CAPA."
             : "Isi tindak lanjut temuan (akar masalah, korektif, preventif). Status ditetapkan Komite."}
         </p>
       </div>
@@ -58,6 +61,14 @@ export default async function CapaInboxPage({
 
       {isKomite ? (
         <>
+          <Section title={`Menunggu Penetapan Prioritas (${priorityPending.length})`}>
+            {priorityPending.length === 0 ? (
+              <Empty>Semua temuan audit sudah memiliki prioritas.</Empty>
+            ) : (
+              priorityPending.map((f) => <PriorityRow key={f.id} f={f} />)
+            )}
+          </Section>
+
           <Section title={`Menunggu Verifikasi (${awaiting.length})`}>
             {awaiting.length === 0 ? (
               <Empty>Tidak ada CAPA yang menunggu verifikasi.</Empty>
@@ -144,8 +155,9 @@ type RowFinding = {
   id: string;
   number: number;
   description: string;
+  kategori: "LOW" | "HIGH" | null;
   guidingQuestion: { pillar: Pillar; subCategory: string };
-  audit: { area: { name: string } };
+  audit: { id: string; area: { name: string } };
 };
 
 function Row({ f, badge }: { f: RowFinding; badge?: React.ReactNode }) {
@@ -161,11 +173,55 @@ function Row({ f, badge }: { f: RowFinding; badge?: React.ReactNode }) {
               {PILLAR_LABEL[f.guidingQuestion.pillar]}
             </span>
             <span className="text-sm font-medium">{f.guidingQuestion.subCategory}</span>
+            {f.kategori && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  f.kategori === "HIGH"
+                    ? "bg-danger/10 text-danger"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {f.kategori === "HIGH" ? "High" : "Low"}
+              </span>
+            )}
           </div>
           <p className="mt-1 truncate text-sm text-muted-foreground">{f.description}</p>
           <p className="text-xs text-muted-foreground">{f.audit.area.name}</p>
         </div>
         {badge}
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </Link>
+    </li>
+  );
+}
+
+function PriorityRow({ f }: { f: RowFinding }) {
+  return (
+    <li>
+      <Link
+        href={`/audit/${f.audit.id}#finding-${f.id}`}
+        className="flex items-center gap-3 p-4 hover:bg-muted/40"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-foreground/90 px-2 py-0.5 text-xs font-bold text-background tabular-nums">
+              #{f.number}
+            </span>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              {PILLAR_LABEL[f.guidingQuestion.pillar]}
+            </span>
+            <span className="text-sm font-medium">
+              {f.guidingQuestion.subCategory}
+            </span>
+          </div>
+          <p className="mt-1 truncate text-sm text-muted-foreground">
+            {f.description}
+          </p>
+          <p className="text-xs text-muted-foreground">{f.audit.area.name}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning">
+          Pilih Low/High
+        </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </Link>
     </li>
