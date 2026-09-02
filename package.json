@@ -21,8 +21,8 @@
     "verify:deploy": "npm run verify:env && npm run check && npm run audit:production && npm run build",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:setup:demo": "prisma db push && npm run db:seed"
+    "db:seed": "node scripts/setup-demo-db.mjs --seed-only",
+    "db:setup:demo": "node scripts/setup-demo-db.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

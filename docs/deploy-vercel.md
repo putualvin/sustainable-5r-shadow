@@ -28,6 +28,9 @@ npm run db:setup:demo
 Vercel build sehingga preview deployment tidak dapat mengubah schema atau
 mereset seed secara tidak sengaja.
 
+Script setup memuat `.env.local`/`.env` menggunakan loader environment Next.js,
+kemudian meneruskan environment yang sama ke Prisma dan seed.
+
 Jika Prisma mendeteksi perubahan yang berpotensi menghapus data, perintah akan
 berhenti. Jangan menambahkan `--accept-data-loss`; periksa perubahan schema
 terlebih dahulu.
