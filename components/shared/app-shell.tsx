@@ -65,14 +65,14 @@ export function AppShell({
   return (
     <div className="min-h-dvh md:flex">
       {/* Sidebar (desktop) */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r bg-card md:flex">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 self-start flex-col overflow-hidden border-r bg-card md:flex">
         <div className="flex h-16 items-center gap-2 border-b px-5">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
             5R
           </span>
           <span className="font-semibold">Sustainable 5R</span>
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {items.map((item) => {
             const Icon = ICONS[item.section];
             return (
