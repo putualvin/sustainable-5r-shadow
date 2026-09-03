@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Repeat,
   ShieldCheck,
+  PlusCircle,
 } from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth";
@@ -191,6 +192,25 @@ export default async function AuditDetailPage(
         </CardContent>
       </Card>
 
+      <nav
+        aria-label="Navigasi temuan audit"
+        className="grid gap-2 sm:grid-cols-2"
+      >
+        <Button asChild variant="outline">
+          <Link href="#previous-findings">
+            <History className="h-4 w-4" /> Temuan Bulan Sebelumnya (
+            {prevFindings.length})
+          </Link>
+        </Button>
+        <Button asChild>
+          <Link href="#current-findings">
+            <PlusCircle className="h-4 w-4" /> Temuan Bulan Ini ({total})
+          </Link>
+        </Button>
+      </nav>
+
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <div id="previous-findings" className="min-w-0 scroll-mt-6">
       {/* Verifikasi temuan bulan lalu (§5.4) — sebelum mencatat temuan baru */}
       {prevFindings.length > 0 && (
         <Card>
@@ -229,7 +249,7 @@ export default async function AuditDetailPage(
               )}
             </p>
 
-            <ul className="space-y-3">
+            <ul className="space-y-3 xl:max-h-[58rem] xl:overflow-y-auto xl:pr-1">
               {prevFindings.map((f) => {
                 const review = reviewByPrev.get(f.id);
                 return (
@@ -379,12 +399,20 @@ export default async function AuditDetailPage(
           </CardContent>
         </Card>
       )}
+        </div>
 
+        <div id="current-findings" className="min-w-0 scroll-mt-6 space-y-6">
       {/* Form tambah temuan (hanya draft, milik auditor) */}
       {canEdit && (
         <Card>
           <CardHeader>
-            <CardTitle>Tambah Temuan</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <PlusCircle className="h-4 w-4 text-primary" /> Temuan Bulan Ini
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Catat temuan baru dari audit periode berjalan. Foto tetap dapat
+              diambil dari kamera atau galeri.
+            </p>
           </CardHeader>
           <CardContent>
             <AddFindingForm
@@ -397,7 +425,9 @@ export default async function AuditDetailPage(
 
       {/* Daftar temuan */}
       <section className="space-y-3">
-        <h2 className="font-semibold">Daftar Temuan ({audit.findings.length})</h2>
+        <h2 className="font-semibold">
+          Daftar Temuan Bulan Ini ({audit.findings.length})
+        </h2>
         {audit.findings.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Belum ada temuan. {canEdit ? "Tambahkan melalui formulir di atas." : ""}
@@ -526,6 +556,8 @@ export default async function AuditDetailPage(
           </Button>
         </form>
       )}
+        </div>
+      </div>
     </div>
   );
 }
