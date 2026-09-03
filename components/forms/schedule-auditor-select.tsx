@@ -16,11 +16,13 @@ export function ScheduleAuditorSelect({
   areaId,
   currentAuditorId,
   auditors,
+  returnTo,
 }: {
   scheduleId: string;
   areaId: string;
   currentAuditorId: string;
   auditors: Auditor[];
+  returnTo?: "/admin";
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const options = auditors.filter((a) => a.areaId !== areaId);
@@ -28,6 +30,7 @@ export function ScheduleAuditorSelect({
   return (
     <form ref={formRef} action={setScheduleAuditor}>
       <input type="hidden" name="scheduleId" value={scheduleId} />
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       <select
         name="auditorId"
         defaultValue={currentAuditorId}

@@ -18,6 +18,66 @@ const ROLES: Role[] = [
   "management",
 ];
 
+// Assign exactly one primary PIC to an area. The same user may also be an
+// auditor, but never for their own area (including an unstarted schedule).
+export async function setAreaPic(formData: FormData): Promise<void> {
+  const actor = await getCurrentUser();
+  if (!actor || !canAccess(actor.roles, "admin")) redirect("/403");
+
+  const areaId = String(formData.get("areaId") ?? "");
+  const picId = String(formData.get("picId") ?? "");
+  const area = await db.area.findUnique({
+    where: { id: areaId },
+    select: { id: true, name: true, active: true },
+  });
+  if (!area || !area.active) redirect("/admin?error=area");
+
+  if (picId) {
+    const [pic, conflictingSchedule] = await Promise.all([
+      db.user.findUnique({ where: { id: picId } }),
+      db.auditSchedule.findFirst({
+        where: { areaId, auditorId: picId, audits: { none: {} } },
+        select: { id: true },
+      }),
+    ]);
+    if (!pic || !pic.active || !pic.roles.includes("auditee")) {
+      redirect("/admin?error=pic");
+    }
+    if (conflictingSchedule) redirect("/admin?error=pic-auditor-conflict");
+  }
+
+  const previous = await db.user.findMany({
+    where: { areaId, roles: { has: "auditee" } },
+    select: { id: true, name: true },
+  });
+
+  await db.$transaction([
+    db.user.updateMany({
+      where: { areaId, roles: { has: "auditee" } },
+      data: { areaId: null },
+    }),
+    ...(picId
+      ? [db.user.update({ where: { id: picId }, data: { areaId } })]
+      : []),
+  ]);
+
+  const selected = picId
+    ? await db.user.findUnique({ where: { id: picId }, select: { name: true } })
+    : null;
+  await logAction({
+    action: "area.pic.assign",
+    entity: "Area",
+    summary: selected
+      ? `Menetapkan ${selected.name} sebagai PIC utama ${area.name}.`
+      : `Menghapus PIC utama ${area.name}${previous.length ? ` (${previous.map((p) => p.name).join(", ")})` : ""}.`,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/capa");
+  revalidatePath("/checklist");
+  revalidatePath("/");
+}
+
 // Set a user's full role set (one or more roles). A user may hold several
 // roles at once — e.g. an area PIC (auditee) who also serves as an auditor.
 export async function setUserRoles(formData: FormData): Promise<void> {
@@ -45,7 +105,15 @@ export async function setUserRoles(formData: FormData): Promise<void> {
 
   const target = await db.user.findUnique({ where: { id: userId } });
   if (target) {
-    await db.user.update({ where: { id: userId }, data: { roles } });
+    await db.user.update({
+      where: { id: userId },
+      data: {
+        roles,
+        // Area membership represents the PIC/Auditee assignment. Remove it
+        // when the user no longer holds the Auditee role.
+        areaId: roles.includes("auditee") ? target.areaId : null,
+      },
+    });
     await logAction({
       action: "user.role.update",
       entity: "User",

@@ -86,14 +86,18 @@ export async function setScheduleAuditor(formData: FormData): Promise<void> {
 
   const scheduleId = String(formData.get("scheduleId") ?? "");
   const auditorId = String(formData.get("auditorId") ?? "");
+  const requestedReturnTo = String(formData.get("returnTo") ?? "");
 
   const schedule = await db.auditSchedule.findUnique({
     where: { id: scheduleId },
     include: { _count: { select: { audits: true } }, area: { select: { name: true } } },
   });
   if (!schedule) redirect("/schedule");
+  const returnTo = requestedReturnTo === "/admin"
+    ? "/admin"
+    : `/schedule?period=${schedule.period}`;
   if (schedule._count.audits > 0) {
-    redirect(`/schedule?period=${schedule.period}`); // already started — locked
+    redirect(returnTo); // already started — locked
   }
 
   const auditor = await db.user.findUnique({ where: { id: auditorId } });
@@ -104,7 +108,7 @@ export async function setScheduleAuditor(formData: FormData): Promise<void> {
     !auditor.roles.includes("auditor") ||
     auditor.areaId === schedule.areaId
   ) {
-    redirect(`/schedule?period=${schedule.period}`);
+    redirect(returnTo);
   }
 
   await db.auditSchedule.update({ where: { id: scheduleId }, data: { auditorId } });
@@ -116,8 +120,9 @@ export async function setScheduleAuditor(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/schedule");
+  revalidatePath("/admin");
   revalidatePath("/");
-  redirect(`/schedule?period=${schedule.period}`);
+  redirect(returnTo);
 }
 
 // Reassign auditors for the period. Schedules whose audit has already started
