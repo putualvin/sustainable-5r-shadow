@@ -418,3 +418,6 @@ function Pending() {
   );
 }
 
+function Tag2({ children, cls }: { children: React.ReactNode; cls: string }) {
+  return <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-medium", cls)}>{children}</span>;
+}
