@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AddFindingForm } from "@/components/forms/add-finding-form";
 import { CapaStatusBadge } from "@/components/shared/capa-status-badge";
+import { RoleSwitcher } from "@/components/shared/role-switcher";
 import { appConfig } from "@/lib/app-config";
 import { ensureDemoPreviousFindings } from "@/lib/demo-previous-findings";
 
@@ -144,9 +145,36 @@ export default async function AuditDetailPage(
             isDraft ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
           }`}
         >
-          {isDraft ? "Draft" : "Terkirim"}
+          {isDraft ? "Draft · Bisa diisi" : "Terkirim · Terkunci"}
         </span>
       </div>
+
+      {!canEdit && (
+        <Card className="border-warning/40 bg-warning/5">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">Mode lihat saja</p>
+              <p className="text-sm text-muted-foreground">
+                {!isDraft
+                  ? "Audit ini sudah dikirim. Penambahan temuan dan verifikasi bulan sebelumnya hanya dapat dilakukan pada audit berstatus Draft."
+                  : "Gunakan peran Auditor yang ditugaskan untuk menambah temuan dan memverifikasi temuan bulan sebelumnya."}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 sm:w-52">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/audit">Pilih Audit Draft</Link>
+              </Button>
+              {!user.roles.includes("auditor") && (
+                <RoleSwitcher
+                  currentEmail={user.email}
+                  variant="full"
+                  align="down"
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Target temuan 21 (20 + 1) */}
       <Card>
