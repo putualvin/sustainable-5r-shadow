@@ -9,6 +9,7 @@ import { canAccess, hasAnyRole } from "@/lib/rbac";
 import { photoDataUrl } from "@/lib/upload";
 import { logAction } from "@/lib/audit-log";
 import { findingPrioritySchema, findingSchema } from "@/lib/schemas/finding";
+import { appConfig } from "@/lib/app-config";
 
 // Start an audit from a schedule entry (auditor for that schedule, or komite/admin).
 export async function startAuditFromSchedule(formData: FormData): Promise<void> {
@@ -290,9 +291,11 @@ export async function submitAudit(formData: FormData): Promise<void> {
     }),
     db.finding.updateMany({
       where: { auditId },
-      // Keep the legacy stored placeholder; PENDING_PRIORITY is the source of
-      // truth that tells the UI and CAPA flow priority is not assigned yet.
-      data: { status: "PENDING_PRIORITY" },
+      // The public Neon demo still uses the legacy database enum, which does
+      // not contain PENDING_PRIORITY. On demo, the submitted audit status is
+      // the source of truth until Komite assigns Low/High and moves the finding
+      // to PENDING_CAPA. Pilot/production use the explicit queue status.
+      data: { status: appConfig.isDemo ? "DRAFT" : "PENDING_PRIORITY" },
     }),
   ]);
 
