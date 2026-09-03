@@ -36,8 +36,11 @@ export default async function CapaInboxPage(
     orderBy: { createdAt: "desc" },
   });
 
-  const priorityPending = findings.filter((f) => !f.kategori);
-  const assigned = findings.filter((f) => Boolean(f.kategori));
+  // Status is the source of truth for priority assignment. The public demo's
+  // legacy database keeps a LOW placeholder in the non-null `kategori` column,
+  // so checking `kategori` alone would hide items still waiting for Komite.
+  const priorityPending = findings.filter((f) => f.status !== "PENDING_CAPA");
+  const assigned = findings.filter((f) => f.status === "PENDING_CAPA");
   const pending = assigned.filter((f) => !f.capa); // auditee belum mengisi
   const awaiting = assigned.filter((f) => f.capa && !f.capa.status); // menunggu verifikasi
   const verified = assigned.filter((f) => f.capa && f.capa.status); // sudah diverifikasi

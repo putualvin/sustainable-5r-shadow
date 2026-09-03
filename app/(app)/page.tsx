@@ -21,6 +21,7 @@ import { formatPeriod, formatDate } from "@/lib/format";
 import { PILLAR_LABEL } from "@/lib/pillars";
 import { urgency } from "@/lib/redtag";
 import { cn } from "@/lib/utils";
+import { appConfig } from "@/lib/app-config";
 import { Card, CardContent } from "@/components/ui/card";
 
 function currentPeriod(): string {
@@ -108,7 +109,10 @@ export default async function HomePage() {
   ] = await Promise.all([
     isKomite
       ? db.finding.findMany({
-          where: { status: "PENDING_PRIORITY", audit: { status: "SUBMITTED" } },
+          where: {
+            status: appConfig.isDemo ? "DRAFT" : "PENDING_PRIORITY",
+            audit: { status: "SUBMITTED" },
+          },
           include: { guidingQuestion: true, audit: { include: { area: true } } },
           orderBy: { createdAt: "asc" },
           take: 6,
@@ -414,6 +418,3 @@ function Pending() {
   );
 }
 
-function Tag2({ children, cls }: { children: React.ReactNode; cls: string }) {
-  return <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-medium", cls)}>{children}</span>;
-}
