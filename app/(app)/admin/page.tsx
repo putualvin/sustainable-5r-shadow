@@ -56,7 +56,7 @@ export default async function AdminPage(
     }),
     db.user.findMany({
       where: { active: true, roles: { has: "auditee" } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, email: true },
       orderBy: { name: "asc" },
     }),
     db.user.findMany({

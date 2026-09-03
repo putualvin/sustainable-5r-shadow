@@ -4,7 +4,7 @@ import { useRef } from "react";
 
 import { setAreaPic } from "@/lib/actions/admin";
 
-type Pic = { id: string; name: string };
+type Pic = { id: string; name: string; email: string };
 
 const selectClass =
   "h-9 w-full min-w-[180px] max-w-[230px] rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -38,7 +38,7 @@ export function AreaPicSelect({
         <option value="">Belum ditetapkan</option>
         {options.map((pic) => (
           <option key={pic.id} value={pic.id}>
-            {pic.name}
+            {pic.name} · {pic.email}
           </option>
         ))}
       </select>
